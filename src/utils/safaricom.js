@@ -5,11 +5,22 @@ const SAFARICOM_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://api.safaricom.co.ke' 
   : 'https://sandbox.safaricom.co.ke';
 
+let cachedToken = null;
+let tokenExpiry = null;
+
 export async function generateAccessToken() {
   try {
-    // Validate environment variables
+    // Use cached token if still valid (5 minutes buffer)
+    if (cachedToken && tokenExpiry && Date.now() < tokenExpiry - 300000) {
+      console.log('🔁 Using cached access token');
+      return cachedToken;
+    }
+
+    console.log('🔄 Generating new M-Pesa access token...');
+    
+    // Validate production credentials
     if (!process.env.SAFARICOM_CONSUMER_KEY || !process.env.SAFARICOM_CONSUMER_SECRET) {
-      throw new Error('Safaricom credentials are not configured');
+      throw new Error('M-Pesa production credentials are not configured');
     }
 
     const auth = Buffer.from(
@@ -20,24 +31,33 @@ export async function generateAccessToken() {
       method: 'GET',
       headers: {
         Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
       },
+      timeout: 10000 // 10 second timeout
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Safaricom API error: ${response.status} - ${errorText}`);
+      console.error('❌ M-Pesa API authentication failed:', response.status);
+      throw new Error(`M-Pesa authentication failed: ${response.status}`);
     }
 
     const data = await response.json();
     
     if (!data.access_token) {
-      throw new Error('No access token received from Safaricom');
+      throw new Error('No access token received from M-Pesa');
     }
 
+    // Cache the token
+    cachedToken = data.access_token;
+    tokenExpiry = Date.now() + (data.expires_in * 1000);
+    
+    console.log('✅ M-Pesa access token generated successfully');
     return data.access_token;
+    
   } catch (error) {
-    console.error('Access token generation error:', error);
-    throw new Error(`Unable to connect to Safaricom: ${error.message}`);
+    console.error('💥 M-Pesa access token generation failed:', error.message);
+    throw new Error(`M-Pesa service unavailable: ${error.message}`);
   }
 }
 
@@ -57,7 +77,7 @@ export function generatePassword() {
   const timestamp = generateTimestamp();
   
   if (!process.env.SAFARICOM_BUSINESS_SHORTCODE || !process.env.SAFARICOM_PASSKEY) {
-    throw new Error('Safaricom business shortcode or passkey not configured');
+    throw new Error('M-Pesa business credentials not configured');
   }
   
   const password = Buffer.from(
@@ -65,5 +85,7 @@ export function generatePassword() {
     process.env.SAFARICOM_PASSKEY + 
     timestamp
   ).toString('base64');
+  
+  console.log('🔐 M-Pesa password generated for timestamp:', timestamp);
   return password;
 }
