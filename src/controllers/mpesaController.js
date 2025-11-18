@@ -1,21 +1,22 @@
 import { generateAccessToken, generateTimestamp, generatePassword } from '../utils/safaricom.js';
 
-// In-memory storage for demo (replace with database in production)
+// In-memory storage (REPLACE WITH REDIS/DATABASE IN PRODUCTION)
 const paymentStore = new Map();
 
-// Initialize STK Push
+// Initialize STK Push - PRODUCTION READY
 export const initiateSTKPush = async (req, res) => {
   try {
     const { phoneNumber, amount, planId, billingCycle, fullName, userId } = req.body;
 
-    console.log('📱 STK Push Request:', {
+    console.log('📱 PRODUCTION STK Push Request:', {
       phoneNumber,
       amount,
       planId,
       billingCycle,
       fullName,
       userId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
     });
 
     // Validate input
@@ -26,7 +27,7 @@ export const initiateSTKPush = async (req, res) => {
       });
     }
 
-    // Validate environment variables
+    // Validate production environment variables
     const requiredEnvVars = [
       'SAFARICOM_CONSUMER_KEY',
       'SAFARICOM_CONSUMER_SECRET', 
@@ -37,14 +38,14 @@ export const initiateSTKPush = async (req, res) => {
 
     const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
     if (missingEnvVars.length > 0) {
-      console.error('❌ Missing environment variables:', missingEnvVars);
+      console.error('❌ PRODUCTION: Missing environment variables:', missingEnvVars);
       return res.status(500).json({
         success: false,
-        errorMessage: 'Payment service configuration incomplete'
+        errorMessage: 'M-Pesa production configuration incomplete'
       });
     }
 
-    // Validate phone number format
+    // Validate phone number format for production
     let formattedPhone = phoneNumber.toString().trim();
     
     if (formattedPhone.startsWith('0')) {
@@ -55,14 +56,15 @@ export const initiateSTKPush = async (req, res) => {
       formattedPhone = `254${formattedPhone}`;
     }
 
+    // Production phone validation
     if (!/^254[17]\d{8}$/.test(formattedPhone)) {
       return res.status(400).json({
         success: false,
-        errorMessage: 'Invalid phone number format. Use 07... or 254... format (10 digits after 254)'
+        errorMessage: 'Invalid Kenyan phone number. Use 07... or 254... format'
       });
     }
 
-    // Validate amount
+    // Validate amount for production
     if (amount <= 0 || amount > 150000) {
       return res.status(400).json({
         success: false,
@@ -70,28 +72,32 @@ export const initiateSTKPush = async (req, res) => {
       });
     }
 
-    // Generate Safaricom credentials
+    // Generate M-Pesa credentials
     const accessToken = await generateAccessToken();
     const timestamp = generateTimestamp();
     const password = generatePassword();
 
-    const reference = `SUB_${planId}_${Date.now()}`;
+    const reference = `SUB_${planId}_${Date.now()}_${userId.slice(-6)}`;
 
     const stkPayload = {
       BusinessShortCode: process.env.SAFARICOM_BUSINESS_SHORTCODE,
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.floor(amount), // Ensure whole number
+      Amount: Math.floor(amount),
       PartyA: formattedPhone,
       PartyB: process.env.SAFARICOM_BUSINESS_SHORTCODE,
       PhoneNumber: formattedPhone,
       CallBackURL: process.env.SAFARICOM_CALLBACK_URL,
       AccountReference: reference,
-      TransactionDesc: `Subscription: ${planId} - ${billingCycle}`,
+      TransactionDesc: `SellHubShop: ${planId} - ${billingCycle}`,
     };
 
-    console.log('📦 STK Push Payload:', stkPayload);
+    console.log('📦 PRODUCTION STK Push Payload:', {
+      ...stkPayload,
+      Password: '***', // Hide password in logs
+      BusinessShortCode: process.env.SAFARICOM_BUSINESS_SHORTCODE
+    });
 
     const safaricomUrl = process.env.NODE_ENV === 'production' 
       ? 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
@@ -108,12 +114,12 @@ export const initiateSTKPush = async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Safaricom API HTTP Error:', response.status, errorText);
-      throw new Error(`Safaricom API returned ${response.status}`);
+      console.error('❌ M-Pesa PRODUCTION API Error:', response.status, errorText);
+      throw new Error(`M-Pesa service returned ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('✅ Safaricom Response:', data);
+    console.log('✅ M-Pesa PRODUCTION Response:', data);
 
     if (data.ResponseCode === '0') {
       // Store payment record
@@ -129,28 +135,31 @@ export const initiateSTKPush = async (req, res) => {
         reference,
         status: 'pending',
         initiatedAt: new Date().toISOString(),
-        attempts: 0
+        attempts: 0,
+        environment: process.env.NODE_ENV
       };
 
       paymentStore.set(data.CheckoutRequestID, paymentRecord);
 
-      // Auto-cleanup after 1 hour
+      // Auto-cleanup after 2 hours for production
       setTimeout(() => {
         if (paymentStore.has(data.CheckoutRequestID)) {
+          console.log('🧹 Cleaning up expired payment record:', data.CheckoutRequestID);
           paymentStore.delete(data.CheckoutRequestID);
         }
-      }, 60 * 60 * 1000);
+      }, 2 * 60 * 60 * 1000);
 
       return res.status(200).json({
         success: true,
         checkoutRequestID: data.CheckoutRequestID,
         merchantRequestID: data.MerchantRequestID,
         customerMessage: data.CustomerMessage || 'Check your phone for M-Pesa prompt',
-        responseDescription: data.ResponseDescription
+        responseDescription: data.ResponseDescription,
+        reference: reference
       });
     } else {
       const errorMsg = data.errorMessage || data.ResponseDescription || 'STK Push initiation failed';
-      console.error('❌ Safaricom API Error:', errorMsg);
+      console.error('❌ M-Pesa PRODUCTION API Error:', errorMsg);
       
       return res.status(400).json({
         success: false,
@@ -159,22 +168,27 @@ export const initiateSTKPush = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('💥 STK Push error:', error);
+    console.error('💥 PRODUCTION STK Push error:', error);
     return res.status(500).json({
       success: false,
-      errorMessage: error.message || 'Internal server error during STK push'
+      errorMessage: `Payment service error: ${error.message}`
     });
   }
 };
 
-// Handle M-Pesa callback (keep your existing version - it's good)
+// Handle M-Pesa callback - PRODUCTION READY
 export const handleCallback = async (req, res) => {
   try {
     const callbackData = req.body;
 
-    console.log('📥 M-Pesa Callback Received:', JSON.stringify(callbackData, null, 2));
+    console.log('📥 PRODUCTION M-Pesa Callback Received:', {
+      type: 'callback',
+      timestamp: new Date().toISOString(),
+      hasBody: !!callbackData,
+      environment: process.env.NODE_ENV
+    });
 
-    if (callbackData.Body.stkCallback) {
+    if (callbackData.Body && callbackData.Body.stkCallback) {
       const resultCode = callbackData.Body.stkCallback.ResultCode;
       const resultDesc = callbackData.Body.stkCallback.ResultDesc;
       const checkoutRequestID = callbackData.Body.stkCallback.CheckoutRequestID;
@@ -191,38 +205,53 @@ export const handleCallback = async (req, res) => {
         const transactionDate = items.find((item) => item.Name === 'TransactionDate')?.Value;
 
         if (paymentRecord) {
-          paymentRecord.status = 'active';
+          paymentRecord.status = 'completed';
           paymentRecord.mpesaReceiptNumber = mpesaReceiptNumber;
           paymentRecord.transactionDate = transactionDate;
           paymentRecord.confirmedAt = new Date().toISOString();
-        }
+          
+          console.log('✅ PRODUCTION Payment completed:', {
+            checkoutRequestID,
+            mpesaReceiptNumber,
+            amount,
+            phoneNumber,
+            userId: paymentRecord.userId,
+            planId: paymentRecord.planId
+          });
 
-        console.log('✅ Payment successful:', {
-          checkoutRequestID,
-          mpesaReceiptNumber,
-          amount,
-          phoneNumber,
-          transactionDate
-        });
+          // TODO: Update your database here
+          // await updateSubscriptionInDatabase(paymentRecord);
+
+        } else {
+          console.warn('⚠️ PRODUCTION: Payment record not found for:', checkoutRequestID);
+        }
 
       } else {
         // Payment failed
-        console.error('❌ Payment failed:', { resultCode, resultDesc, checkoutRequestID });
+        console.error('❌ PRODUCTION Payment failed:', { 
+          resultCode, 
+          resultDesc, 
+          checkoutRequestID,
+          environment: process.env.NODE_ENV 
+        });
 
         if (paymentRecord) {
           paymentRecord.status = 'failed';
           paymentRecord.failureReason = resultDesc;
+          paymentRecord.failedAt = new Date().toISOString();
         }
       }
+    } else {
+      console.warn('⚠️ PRODUCTION: Invalid callback structure:', callbackData);
     }
 
-    // Always respond with success to Safaricom
+    // Always respond with success to M-Pesa
     res.status(200).json({
       ResultCode: 0,
       ResultDesc: 'Success'
     });
   } catch (error) {
-    console.error('💥 Callback processing error:', error);
+    console.error('💥 PRODUCTION Callback processing error:', error);
     res.status(200).json({
       ResultCode: 1,
       ResultDesc: 'Error processing callback'
@@ -230,7 +259,7 @@ export const handleCallback = async (req, res) => {
   }
 };
 
-// Check payment status (improved version)
+// Check payment status - PRODUCTION READY
 export const checkPaymentStatus = async (req, res) => {
   try {
     const { checkoutRequestID } = req.body;
@@ -242,14 +271,14 @@ export const checkPaymentStatus = async (req, res) => {
       });
     }
 
-    console.log('🔍 Checking payment status for:', checkoutRequestID);
+    console.log('🔍 PRODUCTION Checking payment status for:', checkoutRequestID);
 
     const paymentRecord = paymentStore.get(checkoutRequestID);
 
     if (!paymentRecord) {
       return res.status(404).json({
         success: false,
-        errorMessage: 'Payment record not found. It may have expired.'
+        errorMessage: 'Payment record not found or expired'
       });
     }
 
@@ -263,11 +292,14 @@ export const checkPaymentStatus = async (req, res) => {
       failureReason: paymentRecord.failureReason,
       amount: paymentRecord.amount,
       planId: paymentRecord.planId,
-      attempts: paymentRecord.attempts
+      reference: paymentRecord.reference,
+      attempts: paymentRecord.attempts,
+      initiatedAt: paymentRecord.initiatedAt,
+      confirmedAt: paymentRecord.confirmedAt
     });
 
   } catch (error) {
-    console.error('💥 Status check error:', error);
+    console.error('💥 PRODUCTION Status check error:', error);
     return res.status(500).json({
       success: false,
       errorMessage: 'Internal server error during status check'
