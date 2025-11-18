@@ -69,7 +69,7 @@ app.use((error, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Production Backend running on port ${PORT}`);
-  console.log(`📱 M-Pesa API: https://sellhubshop.co.ke/api/mpesa`);
-  console.log(`🏥 Health check: https://sellhubshop.co.ke/api/health`);
+  console.log(`📱 M-Pesa API: https://sellhubshop-backend.onrender.com/api/mpesa`);
+  console.log(`🏥 Health check: https://sellhubshop-backend.onrender.com/api/health`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV}`);
 });
