@@ -1,4 +1,11 @@
 import { generateAccessToken, generateTimestamp, generatePassword } from '../utils/safaricom.js';
+import { createClient } from '@supabase/supabase-js'; // ✅ ADDED: Supabase client
+
+// ✅ ADDED: Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 // In-memory storage (REPLACE WITH REDIS/DATABASE IN PRODUCTION)
 const paymentStore = new Map();
@@ -122,7 +129,37 @@ export const initiateSTKPush = async (req, res) => {
     console.log('✅ M-Pesa PRODUCTION Response:', data);
 
     if (data.ResponseCode === '0') {
-      // Store payment record
+      // ✅ ADDED: Store in Supabase FIRST before in-memory
+      const { error: dbError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          plan_id: planId,
+          plan_name: planId === 'silver' ? 'Professional' : 
+                    planId === 'gold' ? 'Enterprise' : 'Starter',
+          billing_cycle: billingCycle,
+          payment_method: 'mpesa',
+          customer_name: fullName,
+          currency: 'KES',
+          amount: amount,
+          reference: reference,
+          status: 'pending',
+          checkout_request_id: data.CheckoutRequestID,
+          merchant_request_id: data.MerchantRequestID,
+          phone_number: phoneNumber, // Store original format
+          phone_number_api: formattedPhone, // Store API format
+          initiated_at: new Date().toISOString(),
+          activated_at: new Date().toISOString(),
+          is_test_transaction: amount === 1,
+          is_test_amount: amount === 1
+        });
+
+      if (dbError) {
+        console.error('❌ Database insert failed:', dbError);
+        throw new Error('Failed to create subscription record');
+      }
+
+      // Store payment record in memory for callback handling
       const paymentRecord = {
         checkoutRequestID: data.CheckoutRequestID,
         merchantRequestID: data.MerchantRequestID,
@@ -171,7 +208,7 @@ export const initiateSTKPush = async (req, res) => {
     console.error('💥 PRODUCTION STK Push error:', error);
     return res.status(500).json({
       success: false,
-        errorMessage: `Payment service error: ${error.message}`
+      errorMessage: `Payment service error: ${error.message}`
     });
   }
 };
@@ -219,11 +256,84 @@ export const handleCallback = async (req, res) => {
             planId: paymentRecord.planId
           });
 
-          // TODO: Update your database here
-          // await updateSubscriptionInDatabase(paymentRecord);
+          // ✅ FIXED: UPDATE DATABASE - REPLACED TODO
+          try {
+            const { error } = await supabase
+              .from('subscriptions')
+              .update({
+                status: 'active',
+                mpesa_receipt_number: mpesaReceiptNumber,
+                transaction_date: transactionDate,
+                transaction_id: mpesaReceiptNumber,
+                confirmed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('checkout_request_id', checkoutRequestID);
+
+            if (error) {
+              console.error('❌ Database update failed:', error);
+            } else {
+              console.log('✅ Database updated successfully for checkout:', checkoutRequestID);
+              
+              // ✅ ALSO UPDATE user_plans TABLE
+              try {
+                // Get the subscription to create user plan
+                const { data: subscription } = await supabase
+                  .from('subscriptions')
+                  .select('*')
+                  .eq('checkout_request_id', checkoutRequestID)
+                  .single();
+
+                if (subscription) {
+                  // Create user_plans record
+                  const { error: planError } = await supabase
+                    .from('user_plans')
+                    .insert({
+                      user_id: subscription.user_id,
+                      plan_id: subscription.plan_id,
+                      status: 'active',
+                      starts_at: new Date().toISOString(),
+                      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+                      billing_cycle: subscription.billing_cycle
+                    });
+
+                  if (planError) {
+                    console.error('❌ User plan creation failed:', planError);
+                  } else {
+                    console.log('✅ User plan created successfully');
+                  }
+                }
+              } catch (planError) {
+                console.error('❌ User plan creation error:', planError);
+              }
+            }
+          } catch (dbError) {
+            console.error('❌ Database error:', dbError);
+          }
 
         } else {
           console.warn('⚠️ PRODUCTION: Payment record not found for:', checkoutRequestID);
+          
+          // ✅ ADDED: Try to update database even if memory record is missing
+          try {
+            const { error } = await supabase
+              .from('subscriptions')
+              .update({
+                status: 'active',
+                mpesa_receipt_number: mpesaReceiptNumber,
+                transaction_date: transactionDate,
+                transaction_id: mpesaReceiptNumber,
+                confirmed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('checkout_request_id', checkoutRequestID);
+
+            if (!error) {
+              console.log('✅ Database updated from callback (no memory record)');
+            }
+          } catch (dbError) {
+            console.error('❌ Database update from callback failed:', dbError);
+          }
         }
 
       } else {
@@ -239,6 +349,24 @@ export const handleCallback = async (req, res) => {
           paymentRecord.status = 'failed';
           paymentRecord.failureReason = resultDesc;
           paymentRecord.failedAt = new Date().toISOString();
+        }
+
+        // ✅ ADDED: Update database for failed payments too
+        try {
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({
+              status: 'failed',
+              failure_reason: resultDesc,
+              updated_at: new Date().toISOString()
+            })
+            .eq('checkout_request_id', checkoutRequestID);
+
+          if (!error) {
+            console.log('✅ Database updated for failed payment');
+          }
+        } catch (dbError) {
+          console.error('❌ Database update for failed payment failed:', dbError);
         }
       }
     } else {
@@ -273,29 +401,47 @@ export const checkPaymentStatus = async (req, res) => {
 
     console.log('🔍 PRODUCTION Checking payment status for:', checkoutRequestID);
 
+    // ✅ IMPROVED: Check both memory AND database
     const paymentRecord = paymentStore.get(checkoutRequestID);
+    
+    // Also check database
+    const { data: subscription, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('checkout_request_id', checkoutRequestID)
+      .single();
 
-    if (!paymentRecord) {
+    if (error || !subscription) {
       return res.status(404).json({
         success: false,
-        errorMessage: 'Payment record not found or expired'
+        errorMessage: 'Payment record not found'
       });
     }
 
-    // Increment attempt count
-    paymentRecord.attempts = (paymentRecord.attempts || 0) + 1;
+    // Use database status as source of truth
+    const status = subscription.status;
+    const mpesaReceiptNumber = subscription.mpesa_receipt_number;
+    const failureReason = subscription.failure_reason;
+
+    // Update memory record if exists
+    if (paymentRecord) {
+      paymentRecord.attempts = (paymentRecord.attempts || 0) + 1;
+    }
 
     return res.status(200).json({
       success: true,
-      status: paymentRecord.status,
-      mpesaReceiptNumber: paymentRecord.mpesaReceiptNumber,
-      failureReason: paymentRecord.failureReason,
-      amount: paymentRecord.amount,
-      planId: paymentRecord.planId,
-      reference: paymentRecord.reference,
-      attempts: paymentRecord.attempts,
-      initiatedAt: paymentRecord.initiatedAt,
-      confirmedAt: paymentRecord.confirmedAt
+      status: status,
+      mpesaReceiptNumber: mpesaReceiptNumber,
+      failureReason: failureReason,
+      amount: subscription.amount,
+      planId: subscription.plan_id,
+      reference: subscription.reference,
+      attempts: paymentRecord?.attempts || 1,
+      initiatedAt: subscription.initiated_at,
+      confirmedAt: subscription.confirmed_at,
+      // ✅ ADDED: Database timestamp for reliability
+      databaseStatus: status,
+      lastUpdated: subscription.updated_at
     });
 
   } catch (error) {
