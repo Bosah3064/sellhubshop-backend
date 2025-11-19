@@ -306,36 +306,3 @@ export const checkPaymentStatus = async (req, res) => {
     });
   }
 };
-
-// ✅ ADDED: Debug config function
-export const getConfig = async (req, res) => {
-  try {
-    // Hide sensitive values in logs
-    const consumerKey = process.env.SAFARICOM_CONSUMER_KEY;
-    const consumerSecret = process.env.SAFARICOM_CONSUMER_SECRET;
-    const passkey = process.env.SAFARICOM_PASSKEY;
-    
-    res.json({
-      success: true,
-      config: {
-        environment: process.env.NODE_ENV,
-        shortcode: process.env.SAFARICOM_BUSINESS_SHORTCODE,
-        hasConsumerKey: !!consumerKey,
-        hasConsumerSecret: !!consumerSecret,
-        hasPasskey: !!passkey,
-        callbackUrl: process.env.SAFARICOM_CALLBACK_URL,
-        isProduction: process.env.NODE_ENV === 'production',
-        // Safely show first/last chars of sensitive values for verification
-        consumerKeyPreview: consumerKey ? `${consumerKey.substring(0, 6)}...${consumerKey.substring(consumerKey.length - 4)}` : 'MISSING',
-        consumerSecretPreview: consumerSecret ? `${consumerSecret.substring(0, 6)}...${consumerSecret.substring(consumerSecret.length - 4)}` : 'MISSING',
-        passkeyPreview: passkey ? `${passkey.substring(0, 4)}...${passkey.substring(passkey.length - 4)}` : 'MISSING'
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
