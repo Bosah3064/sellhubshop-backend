@@ -1,9 +1,8 @@
 import express from 'express';
-import { initiateSTKPush, handleCallback, checkPaymentStatus } from '../controllers/mpesaController.js';
+import { initiateSTKPush, handleCallback, checkPaymentStatus, getConfig } from '../controllers/mpesaController.js';
 
 const router = express.Router();
 
-// ADD THESE GET ROUTES:
 // Root route for /api/mpesa
 router.get('/', (req, res) => {
   res.json({
@@ -11,6 +10,7 @@ router.get('/', (req, res) => {
     availableEndpoints: {
       'GET /': 'API information',
       'GET /test': 'Test route',
+      'GET /config': 'Check M-Pesa configuration',
       'POST /initiate-stk-push': 'Initiate M-Pesa payment',
       'POST /callback': 'Handle M-Pesa callback',
       'POST /check-status': 'Check payment status'
@@ -26,6 +26,9 @@ router.get('/test', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// ✅ ADDED: Config route for debugging
+router.get('/config', getConfig);
 
 // Info route for initiation (optional)
 router.get('/initiate-info', (req, res) => {
