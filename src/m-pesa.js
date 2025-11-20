@@ -22,13 +22,28 @@ class Mpesa {
   /**
    * Introduce Mpesa Configuration
    * @constructor
-   * @param {Object} [config={}] The Configuration  to use for mPesa
+   * @param {Object} [config={}] The Configuration to use for mPesa
    */
   constructor (config = {}) {
-    if (!config.consumerKey) throw new Error('Consumer Key is Missing')
-    if (!config.consumerSecret) throw new Error('Consumer Secret is Missing')
-    this.configs = { ...config }
-    this.enviroment = config.environment === 'production' ? 'production' : 'sandbox'
+    // Check both config object AND environment variables
+    const consumerKey = config.consumerKey || process.env.MPESA_CONSUMER_KEY
+    const consumerSecret = config.consumerSecret || process.env.MPESA_CONSUMER_SECRET
+    
+    if (!consumerKey) throw new Error('Consumer Key is Missing')
+    if (!consumerSecret) throw new Error('Consumer Secret is Missing')
+    
+    // Merge config with environment variables
+    this.configs = {
+      consumerKey,
+      consumerSecret,
+      lipaNaMpesaShortCode: config.lipaNaMpesaShortCode || process.env.MPESA_SHORTCODE,
+      lipaNaMpesaShortPass: config.lipaNaMpesaShortPass || process.env.MPESA_PASSKEY,
+      securityCredential: config.securityCredential || process.env.MPESA_SECURITY_CREDENTIAL,
+      initiatorName: config.initiatorName || process.env.MPESA_INITIATOR_NAME,
+      ...config
+    }
+    
+    this.enviroment = this.configs.environment === 'production' ? 'production' : 'sandbox'
     this.request = request.bind(this)
     this.security = () => {
       return security(this.configs.certPath, this.configs.securityCredential)
@@ -38,7 +53,6 @@ class Mpesa {
 
   /**
    * AccountBalance via instance
-   * @borrows AccountBalance as accountBalanceCall
    */
   accountBalance () {
     return accountBalance.bind(this)(...arguments)
@@ -46,7 +60,6 @@ class Mpesa {
 
   /**
    * B2B Request via instance
-   * @name b2bCall
    */
   b2b () {
     return b2b.bind(this)(...arguments)
@@ -54,7 +67,6 @@ class Mpesa {
 
   /**
    * B2C Request
-   * @borrows B2CRequest as b2c
    */
   b2c () {
     return b2c.bind(this)(...arguments)
@@ -63,6 +75,7 @@ class Mpesa {
   c2bRegister () {
     return c2bRegister.bind(this)(...arguments)
   }
+  
   c2bSimulate () {
     if(this.enviroment === 'production'){
       throw new Error('Cannot call C2B simulate in production.')

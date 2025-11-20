@@ -13,13 +13,13 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// ✅ FIX: Add request logging middleware
+// Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
   next()
 })
 
-// ✅ FIX: Initialize M-Pesa with error handling
+// Initialize M-Pesa with error handling
 let mpesa
 try {
   mpesa = new Mpesa({
@@ -27,17 +27,14 @@ try {
     consumerSecret: process.env.MPESA_CONSUMER_SECRET,
     lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE,
     lipaNaMpesaShortPass: process.env.MPESA_PASSKEY,
-    securityCredential: process.env.MPESA_SECURITY_CREDENTIAL,
-    initiatorName: process.env.MPESA_INITIATOR_NAME,
     environment: process.env.NODE_ENV || 'sandbox'
   })
   console.log('✅ M-Pesa initialized successfully')
 } catch (error) {
   console.error('❌ M-Pesa initialization failed:', error.message)
-  // Don't exit in production, but log the error
 }
 
-// ✅ FIX: Add root endpoint
+// Root endpoint
 app.get('/', (req, res) => {
   res.json({
     message: 'SellHubShop M-Pesa API',
@@ -46,10 +43,9 @@ app.get('/', (req, res) => {
   })
 })
 
-// STK Push Endpoint
+// STK Push Endpoint (original)
 app.post('/api/stk-push', async (req, res) => {
   try {
-    // ✅ FIX: Check if M-Pesa is initialized
     if (!mpesa) {
       return res.status(503).json({
         success: false,
@@ -66,14 +62,12 @@ app.post('/api/stk-push', async (req, res) => {
       })
     }
 
-    // ✅ FIX: Validate phone number format
     const formattedPhone = phoneNumber.startsWith('254') ? phoneNumber : 
                            phoneNumber.startsWith('0') ? `254${phoneNumber.substring(1)}` : 
                            phoneNumber.startsWith('+254') ? phoneNumber.substring(1) : 
                            `254${phoneNumber}`
 
-    // ✅ FIX: Use environment variable for callback URL
-    const callbackUrl = process.env.MPESA_CALLBACK_URL || `https://${req.get('host')}/api/mpesa/callback`
+    const callbackUrl = `https://sellhubshop-backend.onrender.com/api/mpesa/callback`
 
     const response = await mpesa.lipaNaMpesaOnline(
       formattedPhone,
@@ -91,11 +85,73 @@ app.post('/api/stk-push', async (req, res) => {
     })
 
   } catch (error) {
-    console.error('❌ STK Push Error:', error.response?.data || error.message)
+    console.error('❌ STK Push Error:', error.message)
+    console.error('Error details:', error.response?.data)
+    
     res.status(500).json({
       success: false,
       message: 'Failed to initiate STK push',
-      error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.response?.data || error.message
+      error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    })
+  }
+})
+
+// NEW: Endpoint that your frontend is calling
+app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
+  try {
+    console.log('📱 Frontend STK Push Request:', req.body)
+
+    if (!mpesa) {
+      return res.status(503).json({
+        success: false,
+        message: 'M-Pesa service is not available'
+      })
+    }
+
+    const { phoneNumber, amount, accountRef, planId, billingCycle, fullName } = req.body
+
+    // Use accountRef if provided, otherwise use planId
+    const reference = accountRef || planId || 'TEST123'
+
+    // Format phone number
+    const formattedPhone = phoneNumber.startsWith('254') ? phoneNumber : 
+                           phoneNumber.startsWith('0') ? `254${phoneNumber.substring(1)}` : 
+                           phoneNumber.startsWith('+254') ? phoneNumber.substring(1) : 
+                           `254${phoneNumber}`
+
+    const callbackUrl = `https://sellhubshop-backend.onrender.com/api/mpesa/callback`
+
+    console.log('🚀 Calling M-Pesa STK Push...', {
+      phone: formattedPhone,
+      amount,
+      reference,
+      planId,
+      billingCycle
+    })
+
+    const response = await mpesa.lipaNaMpesaOnline(
+      formattedPhone,
+      amount,
+      callbackUrl,
+      reference
+    )
+
+    console.log('✅ STK Push successful:', response)
+    
+    res.json({
+      success: true,
+      message: 'STK push initiated successfully',
+      data: response
+    })
+
+  } catch (error) {
+    console.error('❌ STK Push Error:', error.message)
+    console.error('Error details:', error.response?.data)
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initiate STK push',
+      error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
     })
   }
 })
@@ -120,8 +176,7 @@ app.post('/api/mpesa/callback', (req, res) => {
         timestamp: new Date().toISOString()
       })
 
-      // TODO: Update your database here
-      // Add your business logic to process successful payment
+      // TODO: Update your database here with payment success
 
     } else {
       const errorMessage = callbackData.Body?.stkCallback?.ResultDesc || 'Unknown error'
@@ -145,7 +200,6 @@ app.post('/api/mpesa/callback', (req, res) => {
 // STK Query Endpoint
 app.post('/api/stk-query', async (req, res) => {
   try {
-    // ✅ FIX: Check if M-Pesa is initialized
     if (!mpesa) {
       return res.status(503).json({
         success: false,
@@ -179,6 +233,35 @@ app.post('/api/stk-query', async (req, res) => {
   }
 })
 
+// Debug endpoints to check configuration
+app.get('/api/debug/config', (req, res) => {
+  res.json({
+    environment: process.env.NODE_ENV,
+    mpesaInitialized: !!mpesa,
+    shortcode: process.env.MPESA_SHORTCODE ? '✅ Set' : '❌ Missing',
+    passkey: process.env.MPESA_PASSKEY ? '✅ Set' : '❌ Missing',
+    consumerKey: process.env.MPESA_CONSUMER_KEY ? '✅ Set' : '❌ Missing',
+    consumerSecret: process.env.MPESA_CONSUMER_SECRET ? '✅ Set' : '❌ Missing'
+  })
+})
+
+app.get('/api/debug/auth', async (req, res) => {
+  try {
+    const token = await mpesa.oAuth()
+    res.json({ 
+      success: true, 
+      message: 'Authentication successful',
+      access_token: token.access_token ? '✅ Valid' : '❌ Invalid'
+    })
+  } catch (error) {
+    res.json({ 
+      success: false, 
+      message: 'Authentication failed',
+      error: error.message 
+    })
+  }
+})
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -191,7 +274,7 @@ app.get('/api/health', (req, res) => {
   })
 })
 
-// ✅ FIX: Add 404 handler for undefined routes
+// 404 handler for undefined routes
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -199,7 +282,7 @@ app.use('*', (req, res) => {
   })
 })
 
-// ✅ FIX: Add error handling middleware
+// Error handling middleware
 app.use((error, req, res, next) => {
   console.error('🚨 Unhandled Error:', error)
   res.status(500).json({
