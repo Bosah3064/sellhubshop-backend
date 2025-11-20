@@ -2,11 +2,19 @@ const express = require('express')
 const cors = require('cors')
 const dotenv = require('dotenv')
 const Mpesa = require('./m-pesa')
+const { createClient } = require('@supabase/supabase-js')
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3001
+
+// Initialize Supabase with service role key
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+console.log('✅ Supabase initialized with service role')
 
 // Middleware
 app.use(cors())
@@ -108,7 +116,7 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
       })
     }
 
-    const { phoneNumber, amount, accountRef, planId, billingCycle, fullName } = req.body
+    const { phoneNumber, amount, accountRef, planId, billingCycle, fullName, userId } = req.body
 
     // Use accountRef if provided, otherwise use planId
     const reference = accountRef || planId || 'TEST123'
@@ -126,8 +134,32 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
       amount,
       reference,
       planId,
-      billingCycle
+      billingCycle,
+      userId
     })
+
+    // Save initial subscription record
+    const { data: subscriptionData, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        plan_name: planId,
+        billing_cycle: billingCycle,
+        amount: amount,
+        status: 'pending',
+        phone_number: formattedPhone,
+        initiated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+
+    if (subscriptionError) {
+      console.error('❌ Failed to create subscription record:', subscriptionError)
+    } else {
+      console.log('✅ Subscription record created:', subscriptionData)
+    }
 
     const response = await mpesa.lipaNaMpesaOnline(
       formattedPhone,
@@ -137,6 +169,18 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
     )
 
     console.log('✅ STK Push successful:', response)
+    
+    // Update subscription with M-Pesa IDs
+    if (subscriptionData && subscriptionData[0]) {
+      await supabase
+        .from('subscriptions')
+        .update({
+          checkout_request_id: response.CheckoutRequestID,
+          merchant_request_id: response.MerchantRequestID,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscriptionData[0].id)
+    }
     
     res.json({
       success: true,
@@ -156,31 +200,69 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
   }
 })
 
-// STK Callback URL
-app.post('/api/mpesa/callback', (req, res) => {
+// UPDATED: STK Callback URL with Database Saving
+app.post('/api/mpesa/callback', async (req, res) => {
   try {
     const callbackData = req.body
 
     console.log('📞 M-Pesa Callback Received:', JSON.stringify(callbackData, null, 2))
 
-    if (callbackData.Body?.stkCallback?.ResultCode === 0) {
+    const merchantRequestID = callbackData.Body?.stkCallback?.MerchantRequestID
+    const checkoutRequestID = callbackData.Body?.stkCallback?.CheckoutRequestID
+    const resultCode = callbackData.Body?.stkCallback?.ResultCode
+    const resultDesc = callbackData.Body?.stkCallback?.ResultDesc
+
+    if (resultCode === 0) {
+      // Payment successful
       const result = callbackData.Body.stkCallback.CallbackMetadata?.Item || []
       const amount = result.find(item => item.Name === 'Amount')?.Value
       const mpesaReceiptNumber = result.find(item => item.Name === 'MpesaReceiptNumber')?.Value
       const phoneNumber = result.find(item => item.Name === 'PhoneNumber')?.Value
+      const transactionDate = result.find(item => item.Name === 'TransactionDate')?.Value
 
-      console.log('💰 Payment Successful:', {
-        amount,
-        mpesaReceiptNumber,
-        phoneNumber,
-        timestamp: new Date().toISOString()
-      })
+      console.log('💰 Payment Successful - Saving to database...')
 
-      // TODO: Update your database here with payment success
+      // Update subscription with successful payment details
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .update({
+          status: 'active',
+          amount: amount,
+          phone_number: phoneNumber,
+          mpesa_receipt_number: mpesaReceiptNumber,
+          transaction_date: transactionDate?.toString(),
+          confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('checkout_request_id', checkoutRequestID)
+        .eq('merchant_request_id', merchantRequestID)
+
+      if (error) {
+        console.error('❌ Database update failed:', error)
+      } else {
+        console.log('✅ Payment successfully saved to database. Updated rows:', data)
+      }
 
     } else {
-      const errorMessage = callbackData.Body?.stkCallback?.ResultDesc || 'Unknown error'
-      console.log('❌ Payment Failed:', errorMessage)
+      // Payment failed
+      console.log('❌ Payment Failed:', resultDesc)
+
+      // Update subscription with failure reason
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .update({
+          status: 'failed',
+          failure_reason: resultDesc,
+          updated_at: new Date().toISOString()
+        })
+        .eq('checkout_request_id', checkoutRequestID)
+        .eq('merchant_request_id', merchantRequestID)
+
+      if (error) {
+        console.error('❌ Failed to update subscription with error:', error)
+      } else {
+        console.log('✅ Failure recorded in database:', data)
+      }
     }
 
     res.json({
@@ -241,7 +323,8 @@ app.get('/api/debug/config', (req, res) => {
     shortcode: process.env.MPESA_SHORTCODE ? '✅ Set' : '❌ Missing',
     passkey: process.env.MPESA_PASSKEY ? '✅ Set' : '❌ Missing',
     consumerKey: process.env.MPESA_CONSUMER_KEY ? '✅ Set' : '❌ Missing',
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET ? '✅ Set' : '❌ Missing'
+    consumerSecret: process.env.MPESA_CONSUMER_SECRET ? '✅ Set' : '❌ Missing',
+    supabaseInitialized: !!supabase
   })
 })
 
@@ -270,6 +353,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     mpesaInitialized: !!mpesa,
+    supabaseInitialized: !!supabase,
     port: PORT
   })
 })
@@ -297,6 +381,7 @@ app.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`📍 Health: https://sellhubshop-backend.onrender.com/api/health`)
   console.log(`🔑 M-Pesa Initialized: ${!!mpesa}`)
+  console.log(`🗄️ Supabase Initialized: ${!!supabase}`)
 })
 
 module.exports = app
