@@ -13,11 +13,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1"
   },
-  "keywords": [
-    "mpesa",
-    "api",
-    "sellhubshop"
-  ],
+  "keywords": ["mpesa", "api", "sellhubshop"],
   "author": "Lameck",
   "license": "MIT"
 }
