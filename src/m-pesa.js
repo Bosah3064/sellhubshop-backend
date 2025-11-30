@@ -32,12 +32,15 @@ class Mpesa {
     if (!consumerKey) throw new Error('Consumer Key is Missing')
     if (!consumerSecret) throw new Error('Consumer Secret is Missing')
     
-    // Merge config with environment variables
+    // ✅ CORRECT: Use TILL NUMBER for STK Push, SHORTCODE for C2B
     this.configs = {
       consumerKey,
       consumerSecret,
-      lipaNaMpesaShortCode: config.lipaNaMpesaShortCode || process.env.MPESA_SHORTCODE,
-      lipaNaMpesaShortPass: config.lipaNaMpesaShortPass || process.env.MPESA_PASSKEY,
+      // ✅ For STK Push (Lipa Na M-Pesa) - Use Till Number (3188230)
+      lipaNaMpesaShortCode: config.lipaNaMpesaShortCode || process.env.MPESA_TILL_NUMBER || 3188230,
+      lipaNaMpesaShortPass: config.lipaNaMpesaShortPass || process.env.MPESA_STK_PASSKEY || process.env.MPESA_PASSKEY,
+      // For C2B - Use ShortCode (3702673)
+      c2bShortCode: config.c2bShortCode || process.env.MPESA_SHORTCODE || 3702673,
       securityCredential: config.securityCredential || process.env.MPESA_SECURITY_CREDENTIAL,
       initiatorName: config.initiatorName || process.env.MPESA_INITIATOR_NAME,
       ...config
@@ -49,6 +52,13 @@ class Mpesa {
       return security(this.configs.certPath, this.configs.securityCredential)
     }
     this.baseURL = `https://${this.enviroment === 'production' ? 'api' : 'sandbox'}.safaricom.co.ke`
+    
+    console.log('🎯 M-Pesa Configuration:', {
+      environment: this.enviroment,
+      stkShortCode: this.configs.lipaNaMpesaShortCode,
+      c2bShortCode: this.configs.c2bShortCode,
+      baseURL: this.baseURL
+    })
   }
 
   /**

@@ -27,17 +27,18 @@ app.use((req, res, next) => {
   next()
 })
 
-// Initialize M-Pesa with error handling
+// Initialize M-Pesa with error handling - UPDATED CONFIGURATION
 let mpesa
 try {
   mpesa = new Mpesa({
     consumerKey: process.env.MPESA_CONSUMER_KEY,
     consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-    lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE,
-    lipaNaMpesaShortPass: process.env.MPESA_PASSKEY,
-    environment: process.env.NODE_ENV || 'sandbox'
+    // ✅ Use TILL NUMBER for STK Push
+    lipaNaMpesaShortCode: process.env.MPESA_TILL_NUMBER || 3188230,
+    lipaNaMpesaShortPass: process.env.MPESA_STK_PASSKEY || process.env.MPESA_PASSKEY,
+    environment: 'production' // Force production environment
   })
-  console.log('✅ M-Pesa initialized successfully')
+  console.log('✅ M-Pesa initialized successfully with Till Number configuration')
 } catch (error) {
   console.error('❌ M-Pesa initialization failed:', error.message)
 }
@@ -51,7 +52,7 @@ app.get('/', (req, res) => {
   })
 })
 
-// STK Push Endpoint (original)
+// STK Push Endpoint (original) - UPDATED
 app.post('/api/stk-push', async (req, res) => {
   try {
     if (!mpesa) {
@@ -70,19 +71,18 @@ app.post('/api/stk-push', async (req, res) => {
       })
     }
 
-    const formattedPhone = phoneNumber.startsWith('254') ? phoneNumber : 
-                           phoneNumber.startsWith('0') ? `254${phoneNumber.substring(1)}` : 
-                           phoneNumber.startsWith('+254') ? phoneNumber.substring(1) : 
-                           `254${phoneNumber}`
-
+    const formattedPhone = formatPhoneNumber(phoneNumber)
     const callbackUrl = `https://sellhubshop-backend.onrender.com/api/mpesa/callback`
 
-    const response = await mpesa.lipaNaMpesaOnline(
-      formattedPhone,
-      amount,
-      callbackUrl,
-      accountRef
-    )
+    // ✅ CORRECT: Use object parameter format
+    const response = await mpesa.lipaNaMpesaOnline({
+      Amount: amount,
+      PartyA: formattedPhone,
+      PhoneNumber: formattedPhone,
+      CallBackURL: callbackUrl,
+      AccountReference: accountRef,
+      TransactionDesc: `Payment for ${accountRef}`
+    })
 
     console.log('✅ STK Push initiated for:', formattedPhone, 'Amount:', amount)
 
@@ -104,7 +104,7 @@ app.post('/api/stk-push', async (req, res) => {
   }
 })
 
-// NEW: Endpoint that your frontend is calling
+// NEW: Endpoint that your frontend is calling - UPDATED
 app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
   try {
     console.log('📱 Frontend STK Push Request:', req.body)
@@ -122,14 +122,11 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
     const reference = accountRef || planId || 'TEST123'
 
     // Format phone number
-    const formattedPhone = phoneNumber.startsWith('254') ? phoneNumber : 
-                           phoneNumber.startsWith('0') ? `254${phoneNumber.substring(1)}` : 
-                           phoneNumber.startsWith('+254') ? phoneNumber.substring(1) : 
-                           `254${phoneNumber}`
+    const formattedPhone = formatPhoneNumber(phoneNumber)
 
     const callbackUrl = `https://sellhubshop-backend.onrender.com/api/mpesa/callback`
 
-    console.log('🚀 Calling M-Pesa STK Push...', {
+    console.log('🚀 Calling M-Pesa STK Push with CORRECT credentials...', {
       phone: formattedPhone,
       amount,
       reference,
@@ -161,12 +158,15 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
       console.log('✅ Subscription record created:', subscriptionData)
     }
 
-    const response = await mpesa.lipaNaMpesaOnline(
-      formattedPhone,
-      amount,
-      callbackUrl,
-      reference
-    )
+    // ✅ CORRECT: Use object parameter format with proper STK Push payload
+    const response = await mpesa.lipaNaMpesaOnline({
+      Amount: amount,
+      PartyA: formattedPhone,
+      PhoneNumber: formattedPhone,
+      CallBackURL: callbackUrl,
+      AccountReference: reference,
+      TransactionDesc: `Payment for ${reference}`
+    })
 
     console.log('✅ STK Push successful:', response)
     
@@ -315,12 +315,13 @@ app.post('/api/stk-query', async (req, res) => {
   }
 })
 
-// Debug endpoints to check configuration
+// Debug endpoints to check configuration - UPDATED
 app.get('/api/debug/config', (req, res) => {
   res.json({
     environment: process.env.NODE_ENV,
     mpesaInitialized: !!mpesa,
-    shortcode: process.env.MPESA_SHORTCODE ? '✅ Set' : '❌ Missing',
+    stkShortCode: process.env.MPESA_TILL_NUMBER ? '✅ Till Number Set' : '❌ Till Number Missing',
+    c2bShortCode: process.env.MPESA_SHORTCODE ? '✅ PayBill Set' : '❌ PayBill Missing',
     passkey: process.env.MPESA_PASSKEY ? '✅ Set' : '❌ Missing',
     consumerKey: process.env.MPESA_CONSUMER_KEY ? '✅ Set' : '❌ Missing',
     consumerSecret: process.env.MPESA_CONSUMER_SECRET ? '✅ Set' : '❌ Missing',
@@ -334,7 +335,8 @@ app.get('/api/debug/auth', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Authentication successful',
-      access_token: token.access_token ? '✅ Valid' : '❌ Invalid'
+      access_token: token.data?.access_token ? '✅ Valid' : '❌ Invalid',
+      token_type: token.data?.token_type
     })
   } catch (error) {
     res.json({ 
@@ -375,12 +377,79 @@ app.use((error, req, res, next) => {
   })
 })
 
+// C2B Validation Endpoint - REQUIRED by Safaricom
+app.post('/api/mpesa/validate', async (req, res) => {
+  try {
+    const validationData = req.body;
+    console.log('🔍 C2B Validation Received:', JSON.stringify(validationData, null, 2));
+    
+    // Always accept for now - you can add business logic later
+    res.json({
+      ResultCode: 0,
+      ResultDesc: "Accepted"
+    });
+    
+  } catch (error) {
+    console.error('❌ C2B Validation Error:', error);
+    res.json({
+      ResultCode: 1,
+      ResultDesc: "Validation Error"
+    });
+  }
+});
+
+// C2B Confirmation Endpoint - REQUIRED by Safaricom
+app.post('/api/mpesa/confirm', async (req, res) => {
+  try {
+    const confirmationData = req.body;
+    console.log('💰 C2B Confirmation Received:', JSON.stringify(confirmationData, null, 2));
+    
+    // Log the payment - you can save to database later
+    console.log('💳 Payment Details:', {
+      TransactionID: confirmationData.TransID,
+      Amount: confirmationData.TransAmount,
+      Reference: confirmationData.BillRefNumber,
+      Phone: confirmationData.MSISDN
+    });
+    
+    res.json({
+      ResultCode: 0,
+      ResultDesc: "Success"
+    });
+    
+  } catch (error) {
+    console.error('❌ C2B Confirmation Error:', error);
+    res.json({
+      ResultCode: 1,
+      ResultDesc: "Processing Error"
+    });
+  }
+});
+
+// Phone number formatting helper function
+function formatPhoneNumber(phone) {
+  const cleaned = phone.toString().replace(/\D/g, '')
+  
+  if (cleaned.startsWith('0')) {
+    return '254' + cleaned.substring(1)
+  } else if (cleaned.startsWith('7') && cleaned.length === 9) {
+    return '254' + cleaned
+  } else if (cleaned.startsWith('254') && cleaned.length === 12) {
+    return cleaned
+  } else if (cleaned.startsWith('+254')) {
+    return cleaned.substring(1)
+  }
+  
+  return cleaned
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 SellHubShop Backend running on port ${PORT}`)
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`📍 Health: https://sellhubshop-backend.onrender.com/api/health`)
   console.log(`🔑 M-Pesa Initialized: ${!!mpesa}`)
+  console.log(`🎯 STK ShortCode: ${process.env.MPESA_TILL_NUMBER || 3188230}`)
   console.log(`🗄️ Supabase Initialized: ${!!supabase}`)
 })
 
