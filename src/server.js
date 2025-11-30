@@ -1,10 +1,18 @@
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
+const cors = require('cors'); // <-- import cors
 const mPesaRoutes = require('./m-pesa');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Enable CORS
+app.use(cors({
+  origin: ['http://localhost:8080', 'https://sellhubshop.co.ke'], // frontend domains you want to allow
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
+}));
 
 app.use(bodyParser.json());
 app.use('/endpoints', mPesaRoutes);
