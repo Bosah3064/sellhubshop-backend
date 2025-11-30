@@ -9,80 +9,148 @@ const moment = require('moment')
  * @see {@link https://developer.safaricom.co.ke/docs#lipa-na-m-pesa-online-request | Lipa Na Mpesa Online Request}
  */
 const lipaNaMpesaOnline = function (payload = {}) {
-  const {
-    BusinessShortCode = this.configs.lipaNaMpesaShortCode, // ✅ Now uses Till Number (3188230)
-    TransactionType = 'CustomerBuyGoodsOnline', // ✅ Changed from CustomerPayBillOnline
-    Amount,
-    PartyA,
-    PartyB = this.configs.lipaNaMpesaShortCode, // ✅ Now uses Till Number (3188230)
-    PhoneNumber,
-    CallBackURL,
-    AccountReference,
-    TransactionDesc
-  } = payload
+  try {
+    const {
+      BusinessShortCode = this.configs?.lipaNaMpesaShortCode,
+      TransactionType = 'CustomerBuyGoodsOnline',
+      Amount,
+      PartyA,
+      PartyB = this.configs?.lipaNaMpesaShortCode,
+      PhoneNumber,
+      CallBackURL,
+      AccountReference,
+      TransactionDesc
+    } = payload
 
-  // Validate required fields
-  const missing = []
-  if (!Amount) missing.push('Amount')
-  if (!PartyA) missing.push('PartyA')
-  if (!PhoneNumber) missing.push('PhoneNumber')
-  if (!CallBackURL) missing.push('CallBackURL')
+    // ✅ Enhanced validation with better error handling
+    const missing = []
+    if (!Amount) missing.push('Amount')
+    if (!PartyA) missing.push('PartyA')
+    if (!PhoneNumber) missing.push('PhoneNumber')
+    if (!CallBackURL) missing.push('CallBackURL')
 
-  if (missing.length) {
-    throw new Error(`The following LipaNaMpesaOnline parameters are missing: ${missing.join(', ')}`)
+    if (missing.length) {
+      throw new Error(`The following LipaNaMpesaOnline parameters are missing: ${missing.join(', ')}`)
+    }
+
+    // ✅ Validate configuration exists
+    if (!this.configs?.lipaNaMpesaShortCode || !this.configs?.lipaNaMpesaShortPass) {
+      throw new Error('M-Pesa configuration is missing or incomplete. Please check lipaNaMpesaShortCode and lipaNaMpesaShortPass.')
+    }
+
+    // ✅ Generate password with TILL NUMBER
+    const timestamp = moment().format('YYYYMMDDHHmmss')
+    const password = Buffer.from(
+      `${BusinessShortCode}${this.configs.lipaNaMpesaShortPass}${timestamp}`
+    ).toString('base64')
+
+    // ✅ Safely format phone numbers with error handling
+    const formattedPartyA = formatPhoneNumber(PartyA)
+    const formattedPhoneNumber = formatPhoneNumber(PhoneNumber)
+
+    const requestPayload = {
+      BusinessShortCode: parseInt(BusinessShortCode),
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType,
+      Amount: parseInt(Amount),
+      PartyA: formattedPartyA,
+      PartyB: parseInt(PartyB),
+      PhoneNumber: formattedPhoneNumber,
+      CallBackURL,
+      AccountReference: AccountReference?.toString().substring(0, 12) || 'Payment', // Truncate to 12 chars max
+      TransactionDesc: TransactionDesc?.toString().substring(0, 13) || 'Payment' // Truncate to 13 chars max
+    }
+
+    console.log('🎯 CORRECT STK Push Payload:', {
+      BusinessShortCode: requestPayload.BusinessShortCode,
+      TransactionType: requestPayload.TransactionType,
+      PartyB: requestPayload.PartyB,
+      Amount: requestPayload.Amount,
+      PhoneNumber: requestPayload.PhoneNumber,
+      AccountReference: requestPayload.AccountReference
+    })
+
+    return this.request({
+      url: '/mpesa/stkpush/v1/processrequest',
+      method: 'POST',
+      body: requestPayload
+    })
+  } catch (error) {
+    console.error('❌ STK Push Initialization Error:', {
+      message: error.message,
+      payload: payload,
+      config: {
+        shortCode: this.configs?.lipaNaMpesaShortCode,
+        hasPass: !!this.configs?.lipaNaMpesaShortPass
+      }
+    })
+    throw error // Re-throw to let caller handle it
   }
-
-  // ✅ Generate password with TILL NUMBER
-  const timestamp = moment().format('YYYYMMDDHHmmss')
-  const password = Buffer.from(
-    `${BusinessShortCode}${this.configs.lipaNaMpesaShortPass}${timestamp}`
-  ).toString('base64')
-
-  const requestPayload = {
-    BusinessShortCode: parseInt(BusinessShortCode),
-    Password: password,
-    Timestamp: timestamp,
-    TransactionType, // ✅ Now 'CustomerBuyGoodsOnline'
-    Amount: parseInt(Amount),
-    PartyA: formatPhoneNumber(PartyA),
-    PartyB: parseInt(PartyB), // ✅ Now Till Number
-    PhoneNumber: formatPhoneNumber(PhoneNumber),
-    CallBackURL,
-    AccountReference: AccountReference || 'Payment',
-    TransactionDesc: TransactionDesc || 'Payment'
-  }
-
-  console.log('🎯 CORRECT STK Push Payload:', {
-    BusinessShortCode: requestPayload.BusinessShortCode,
-    TransactionType: requestPayload.TransactionType,
-    PartyB: requestPayload.PartyB,
-    Amount: requestPayload.Amount,
-    PhoneNumber: requestPayload.PhoneNumber,
-    AccountReference: requestPayload.AccountReference
-  })
-
-  return this.request({
-    url: '/mpesa/stkpush/v1/processrequest',
-    method: 'POST',
-    body: requestPayload
-  })
 }
 
-// Add phone formatting helper
+/**
+ * Enhanced phone formatting helper with safety checks
+ * @param {string|number} phone - The phone number to format
+ * @returns {string} Formatted phone number (254XXXXXXXXX)
+ */
 function formatPhoneNumber(phone) {
-  const cleaned = phone.toString().replace(/\D/g, '')
-  
-  if (cleaned.startsWith('0')) {
-    return '254' + cleaned.substring(1)
-  } else if (cleaned.startsWith('7') && cleaned.length === 9) {
-    return '254' + cleaned
-  } else if (cleaned.startsWith('254') && cleaned.length === 12) {
+  try {
+    // ✅ Safety check for undefined/null
+    if (phone === null || phone === undefined) {
+      throw new Error('Phone number is null or undefined')
+    }
+
+    // ✅ Convert to string safely
+    const phoneString = phone.toString ? phone.toString() : String(phone)
+    
+    // ✅ Check if string is empty after conversion
+    if (!phoneString || phoneString.trim().length === 0) {
+      throw new Error('Phone number is empty')
+    }
+
+    const cleaned = phoneString.replace(/\D/g, '')
+    
+    // ✅ Validate the cleaned number
+    if (!cleaned) {
+      throw new Error('Phone number contains no digits')
+    }
+
+    if (cleaned.length < 9) {
+      throw new Error(`Phone number too short: ${cleaned}`)
+    }
+
+    if (cleaned.length > 12) {
+      throw new Error(`Phone number too long: ${cleaned}`)
+    }
+
+    // ✅ Format the phone number
+    if (cleaned.startsWith('0')) {
+      return '254' + cleaned.substring(1)
+    } else if (cleaned.startsWith('7') && cleaned.length === 9) {
+      return '254' + cleaned
+    } else if (cleaned.startsWith('254') && cleaned.length === 12) {
+      return cleaned
+    } else if (cleaned.startsWith('+254')) {
+      return cleaned.substring(1)
+    } else if (cleaned.startsWith('1') || cleaned.startsWith('2')) {
+      // Already in international format but might be missing 254
+      if (cleaned.length === 9) {
+        return '254' + cleaned
+      }
+    }
+    
+    // ✅ Return as-is with warning if format is unexpected
+    console.warn(`⚠️ Unexpected phone number format: ${cleaned}. Using as-is.`)
     return cleaned
-  } else if (cleaned.startsWith('+254')) {
-    return cleaned.substring(1)
+    
+  } catch (error) {
+    console.error('❌ Phone Number Formatting Error:', {
+      originalPhone: phone,
+      error: error.message
+    })
+    throw new Error(`Invalid phone number: ${error.message}`)
   }
-  
-  return cleaned // Return as-is if we can't format
 }
 
 module.exports = lipaNaMpesaOnline
