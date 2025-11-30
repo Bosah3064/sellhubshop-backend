@@ -27,18 +27,18 @@ app.use((req, res, next) => {
   next()
 })
 
-// Initialize M-Pesa with error handling - UPDATED WITH SHORT CODE
+// Initialize M-Pesa with error handling - UPDATED WITH CORRECT SHORT CODE
 let mpesa
 try {
   mpesa = new Mpesa({
     consumerKey: process.env.MPESA_CONSUMER_KEY,
     consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-    // ✅ Use SHORT CODE for STK Push (3702683)
-    lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE || 3702683,
+    // ✅ CORRECT SHORT CODE: 3702673
+    lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE || 3702673,
     lipaNaMpesaShortPass: process.env.MPESA_STK_PASSKEY || process.env.MPESA_PASSKEY,
     environment: 'production'
   })
-  console.log('✅ M-Pesa initialized successfully with Short Code configuration')
+  console.log('✅ M-Pesa initialized successfully with Short Code:', mpesa.configs.lipaNaMpesaShortCode)
 } catch (error) {
   console.error('❌ M-Pesa initialization failed:', error.message)
 }
@@ -344,17 +344,30 @@ app.post('/api/stk-query', async (req, res) => {
   }
 })
 
-// ADD THIS ENDPOINT - Payment Status Check
+// ✅ FIXED: Payment Status Check Endpoint - COMPLETELY UPDATED
 app.post('/api/mpesa/check-status', async (req, res) => {
   try {
-    const { checkoutRequestId, reference } = req.body;
+    console.log('🔍 Full request body received:', req.body);
     
-    console.log('🔍 Checking payment status:', { checkoutRequestId, reference });
+    const { checkoutRequestId, checkoutRequestID, reference } = req.body;
     
-    if (!checkoutRequestId) {
+    // Handle different parameter names from frontend
+    const actualCheckoutRequestId = checkoutRequestId || checkoutRequestID;
+    
+    console.log('🔍 Extracted parameters:', {
+      checkoutRequestId,
+      checkoutRequestID,
+      actualCheckoutRequestId,
+      reference
+    });
+    
+    // ✅ BETTER VALIDATION
+    if (!actualCheckoutRequestId) {
       return res.status(400).json({
         success: false,
-        message: 'checkoutRequestId is required'
+        message: 'checkoutRequestId is required',
+        received: req.body,
+        help: 'Please send { "checkoutRequestId": "ws_CO_..." }'
       });
     }
     
@@ -365,48 +378,68 @@ app.post('/api/mpesa/check-status', async (req, res) => {
       });
     }
 
+    console.log('🔍 Querying M-Pesa for:', actualCheckoutRequestId);
+    
     // Query M-Pesa for transaction status
-    const queryResult = await mpesa.lipaNaMpesaQuery(checkoutRequestId);
+    const queryResult = await mpesa.lipaNaMpesaQuery(actualCheckoutRequestId);
     
     console.log('📊 M-Pesa Query Result:', queryResult.data);
     
-    // Check if we have a subscription to update
-    if (queryResult.data.ResultCode === '0') {
-      // Payment successful - update subscription
-      const { data: subscriptionData, error: updateError } = await supabase
-        .from('subscriptions')
-        .update({
-          status: 'active',
-          confirmed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('checkout_request_id', checkoutRequestId)
-        .select();
+    // Check subscription status in database
+    const { data: subscription, error: subError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('checkout_request_id', actualCheckoutRequestId)
+      .single();
 
-      if (updateError) {
-        console.error('❌ Failed to update subscription:', updateError);
-      } else {
-        console.log('✅ Subscription updated to active:', subscriptionData);
+    if (subError) {
+      console.log('📋 No subscription found for:', actualCheckoutRequestId);
+    }
+    
+    let status = 'pending';
+    let resultCode = queryResult.data.ResultCode;
+    
+    // Determine status based on M-Pesa response
+    if (resultCode === '0') {
+      status = 'completed';
+      
+      // Update subscription if found
+      if (subscription) {
+        await supabase
+          .from('subscriptions')
+          .update({
+            status: 'active',
+            confirmed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('checkout_request_id', actualCheckoutRequestId);
       }
+    } else if (resultCode && resultCode !== '0') {
+      status = 'failed';
     }
     
     res.json({
       success: true,
-      data: queryResult.data,
-      status: queryResult.data.ResultCode === '0' ? 'completed' : 'pending',
-      resultCode: queryResult.data.ResultCode,
-      resultDesc: queryResult.data.ResultDesc
+      status: status,
+      resultCode: resultCode,
+      resultDesc: queryResult.data.ResultDesc,
+      checkoutRequestId: actualCheckoutRequestId,
+      subscription: subscription || null,
+      data: queryResult.data
     });
     
   } catch (error) {
     console.error('❌ Payment status check failed:', error.message);
     
-    // Even if query fails, we can check database status
-    if (checkoutRequestId) {
+    // Even if M-Pesa query fails, check database
+    const { checkoutRequestId, checkoutRequestID } = req.body;
+    const actualCheckoutRequestId = checkoutRequestId || checkoutRequestID;
+    
+    if (actualCheckoutRequestId) {
       const { data: subscription } = await supabase
         .from('subscriptions')
-        .select('status, mpesa_receipt_number')
-        .eq('checkout_request_id', checkoutRequestId)
+        .select('status, mpesa_receipt_number, failure_reason')
+        .eq('checkout_request_id', actualCheckoutRequestId)
         .single();
 
       if (subscription) {
@@ -414,7 +447,8 @@ app.post('/api/mpesa/check-status', async (req, res) => {
           success: true,
           status: subscription.status,
           mpesaReceiptNumber: subscription.mpesa_receipt_number,
-          message: 'Using database status'
+          failureReason: subscription.failure_reason,
+          message: 'Using database status (M-Pesa query failed)'
         });
       }
     }
@@ -422,6 +456,66 @@ app.post('/api/mpesa/check-status', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to check payment status',
+      error: error.message,
+      help: 'Check if checkoutRequestId is correct and M-Pesa service is available'
+    });
+  }
+});
+
+// ✅ ADD: Debug Status Check Endpoint
+app.post('/api/debug/status-check', async (req, res) => {
+  try {
+    const { checkoutRequestId } = req.body;
+    
+    console.log('🧪 Debug Status Check Request:', req.body);
+    
+    if (!checkoutRequestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'checkoutRequestId is required',
+        example: { "checkoutRequestId": "ws_CO_30112025133803647790397468" }
+      });
+    }
+    
+    // Test database lookup
+    const { data: subscription, error: dbError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('checkout_request_id', checkoutRequestId)
+      .single();
+    
+    console.log('📋 Database lookup result:', { subscription, dbError });
+    
+    // Test M-Pesa query
+    let mpesaResult = null;
+    try {
+      mpesaResult = await mpesa.lipaNaMpesaQuery(checkoutRequestId);
+      console.log('📊 M-Pesa query result:', mpesaResult.data);
+    } catch (mpesaError) {
+      console.log('❌ M-Pesa query failed:', mpesaError.message);
+    }
+    
+    res.json({
+      success: true,
+      debug: {
+        receivedCheckoutRequestId: checkoutRequestId,
+        database: {
+          found: !!subscription,
+          data: subscription,
+          error: dbError?.message
+        },
+        mpesa: {
+          success: !!mpesaResult,
+          data: mpesaResult?.data,
+          error: mpesaResult ? null : 'M-Pesa query failed'
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug status check failed:', error);
+    res.status(500).json({
+      success: false,
       error: error.message
     });
   }
@@ -614,7 +708,7 @@ app.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`📍 Health: https://sellhubshop-backend.onrender.com/api/health`)
   console.log(`🔑 M-Pesa Initialized: ${!!mpesa}`)
-  console.log(`🎯 STK ShortCode: ${process.env.MPESA_SHORTCODE || 3702683}`) // ✅ Updated to show Short Code
+  console.log(`🎯 STK ShortCode: ${process.env.MPESA_SHORTCODE || 3702673}`) // ✅ Updated to show correct Short Code
   console.log(`🗄️ Supabase Initialized: ${!!supabase}`)
 })
 
