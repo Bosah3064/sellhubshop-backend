@@ -104,7 +104,7 @@ app.post('/api/stk-push', async (req, res) => {
   }
 })
 
-// NEW: Endpoint that your frontend is calling - UPDATED
+// NEW: Endpoint that your frontend is calling - FIXED
 app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
   try {
     console.log('📱 Frontend STK Push Request:', req.body)
@@ -168,24 +168,36 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
       TransactionDesc: `Payment for ${reference}`
     })
 
-    console.log('✅ STK Push successful:', response)
+    console.log('✅ STK Push successful:', response.data)
+    
+    // ✅ FIX: Extract checkoutRequestID from response.data (not response directly)
+    const checkoutRequestId = response.data.CheckoutRequestID;
+    const merchantRequestId = response.data.MerchantRequestID;
+    
+    console.log('🎯 Extracted M-Pesa IDs:', {
+      checkoutRequestId,
+      merchantRequestId
+    })
     
     // Update subscription with M-Pesa IDs
     if (subscriptionData && subscriptionData[0]) {
       await supabase
         .from('subscriptions')
         .update({
-          checkout_request_id: response.CheckoutRequestID,
-          merchant_request_id: response.MerchantRequestID,
+          checkout_request_id: checkoutRequestId,
+          merchant_request_id: merchantRequestId,
           updated_at: new Date().toISOString()
         })
         .eq('id', subscriptionData[0].id)
     }
     
+    // ✅ FIXED: Return checkoutRequestID to frontend
     res.json({
       success: true,
       message: 'STK push initiated successfully',
-      data: response
+      checkoutRequestID: checkoutRequestId, // ✅ Now frontend gets this
+      merchantRequestID: merchantRequestId, // ✅ Add this too
+      data: response.data
     })
 
   } catch (error) {
@@ -315,133 +327,6 @@ app.post('/api/stk-query', async (req, res) => {
   }
 })
 
-// Debug endpoints to check configuration - UPDATED
-app.get('/api/debug/config', (req, res) => {
-  res.json({
-    environment: process.env.NODE_ENV,
-    mpesaInitialized: !!mpesa,
-    stkShortCode: process.env.MPESA_TILL_NUMBER ? '✅ Till Number Set' : '❌ Till Number Missing',
-    c2bShortCode: process.env.MPESA_SHORTCODE ? '✅ PayBill Set' : '❌ PayBill Missing',
-    passkey: process.env.MPESA_PASSKEY ? '✅ Set' : '❌ Missing',
-    consumerKey: process.env.MPESA_CONSUMER_KEY ? '✅ Set' : '❌ Missing',
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET ? '✅ Set' : '❌ Missing',
-    supabaseInitialized: !!supabase
-  })
-})
-
-app.get('/api/debug/auth', async (req, res) => {
-  try {
-    const token = await mpesa.oAuth()
-    res.json({ 
-      success: true, 
-      message: 'Authentication successful',
-      access_token: token.data?.access_token ? '✅ Valid' : '❌ Invalid',
-      token_type: token.data?.token_type
-    })
-  } catch (error) {
-    res.json({ 
-      success: false, 
-      message: 'Authentication failed',
-      error: error.message 
-    })
-  }
-})
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'SellHubShop M-Pesa API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    mpesaInitialized: !!mpesa,
-    supabaseInitialized: !!supabase,
-    port: PORT
-  })
-})
-
-// 404 handler for undefined routes
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint not found'
-  })
-})
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('🚨 Unhandled Error:', error)
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error'
-  })
-})
-
-// C2B Validation Endpoint - REQUIRED by Safaricom
-app.post('/api/mpesa/validate', async (req, res) => {
-  try {
-    const validationData = req.body;
-    console.log('🔍 C2B Validation Received:', JSON.stringify(validationData, null, 2));
-    
-    // Always accept for now - you can add business logic later
-    res.json({
-      ResultCode: 0,
-      ResultDesc: "Accepted"
-    });
-    
-  } catch (error) {
-    console.error('❌ C2B Validation Error:', error);
-    res.json({
-      ResultCode: 1,
-      ResultDesc: "Validation Error"
-    });
-  }
-});
-
-// C2B Confirmation Endpoint - REQUIRED by Safaricom
-app.post('/api/mpesa/confirm', async (req, res) => {
-  try {
-    const confirmationData = req.body;
-    console.log('💰 C2B Confirmation Received:', JSON.stringify(confirmationData, null, 2));
-    
-    // Log the payment - you can save to database later
-    console.log('💳 Payment Details:', {
-      TransactionID: confirmationData.TransID,
-      Amount: confirmationData.TransAmount,
-      Reference: confirmationData.BillRefNumber,
-      Phone: confirmationData.MSISDN
-    });
-    
-    res.json({
-      ResultCode: 0,
-      ResultDesc: "Success"
-    });
-    
-  } catch (error) {
-    console.error('❌ C2B Confirmation Error:', error);
-    res.json({
-      ResultCode: 1,
-      ResultDesc: "Processing Error"
-    });
-  }
-});
-
-// Phone number formatting helper function
-function formatPhoneNumber(phone) {
-  const cleaned = phone.toString().replace(/\D/g, '')
-  
-  if (cleaned.startsWith('0')) {
-    return '254' + cleaned.substring(1)
-  } else if (cleaned.startsWith('7') && cleaned.length === 9) {
-    return '254' + cleaned
-  } else if (cleaned.startsWith('254') && cleaned.length === 12) {
-    return cleaned
-  } else if (cleaned.startsWith('+254')) {
-    return cleaned.substring(1)
-  }
-  
-  return cleaned
-}
 // ADD THIS ENDPOINT - Payment Status Check
 app.post('/api/mpesa/check-status', async (req, res) => {
   try {
@@ -524,6 +409,135 @@ app.post('/api/mpesa/check-status', async (req, res) => {
     });
   }
 });
+
+// Debug endpoints to check configuration - UPDATED
+app.get('/api/debug/config', (req, res) => {
+  res.json({
+    environment: process.env.NODE_ENV,
+    mpesaInitialized: !!mpesa,
+    stkShortCode: process.env.MPESA_TILL_NUMBER ? '✅ Till Number Set' : '❌ Till Number Missing',
+    c2bShortCode: process.env.MPESA_SHORTCODE ? '✅ PayBill Set' : '❌ PayBill Missing',
+    passkey: process.env.MPESA_PASSKEY ? '✅ Set' : '❌ Missing',
+    consumerKey: process.env.MPESA_CONSUMER_KEY ? '✅ Set' : '❌ Missing',
+    consumerSecret: process.env.MPESA_CONSUMER_SECRET ? '✅ Set' : '❌ Missing',
+    supabaseInitialized: !!supabase
+  })
+})
+
+app.get('/api/debug/auth', async (req, res) => {
+  try {
+    const token = await mpesa.oAuth()
+    res.json({ 
+      success: true, 
+      message: 'Authentication successful',
+      access_token: token.data?.access_token ? '✅ Valid' : '❌ Invalid',
+      token_type: token.data?.token_type
+    })
+  } catch (error) {
+    res.json({ 
+      success: false, 
+      message: 'Authentication failed',
+      error: error.message 
+    })
+  }
+})
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'SellHubShop M-Pesa API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    mpesaInitialized: !!mpesa,
+    supabaseInitialized: !!supabase,
+    port: PORT
+  })
+})
+
+// C2B Validation Endpoint - REQUIRED by Safaricom
+app.post('/api/mpesa/validate', async (req, res) => {
+  try {
+    const validationData = req.body;
+    console.log('🔍 C2B Validation Received:', JSON.stringify(validationData, null, 2));
+    
+    // Always accept for now - you can add business logic later
+    res.json({
+      ResultCode: 0,
+      ResultDesc: "Accepted"
+    });
+    
+  } catch (error) {
+    console.error('❌ C2B Validation Error:', error);
+    res.json({
+      ResultCode: 1,
+      ResultDesc: "Validation Error"
+    });
+  }
+});
+
+// C2B Confirmation Endpoint - REQUIRED by Safaricom
+app.post('/api/mpesa/confirm', async (req, res) => {
+  try {
+    const confirmationData = req.body;
+    console.log('💰 C2B Confirmation Received:', JSON.stringify(confirmationData, null, 2));
+    
+    // Log the payment - you can save to database later
+    console.log('💳 Payment Details:', {
+      TransactionID: confirmationData.TransID,
+      Amount: confirmationData.TransAmount,
+      Reference: confirmationData.BillRefNumber,
+      Phone: confirmationData.MSISDN
+    });
+    
+    res.json({
+      ResultCode: 0,
+      ResultDesc: "Success"
+    });
+    
+  } catch (error) {
+    console.error('❌ C2B Confirmation Error:', error);
+    res.json({
+      ResultCode: 1,
+      ResultDesc: "Processing Error"
+    });
+  }
+});
+
+// Phone number formatting helper function
+function formatPhoneNumber(phone) {
+  const cleaned = phone.toString().replace(/\D/g, '')
+  
+  if (cleaned.startsWith('0')) {
+    return '254' + cleaned.substring(1)
+  } else if (cleaned.startsWith('7') && cleaned.length === 9) {
+    return '254' + cleaned
+  } else if (cleaned.startsWith('254') && cleaned.length === 12) {
+    return cleaned
+  } else if (cleaned.startsWith('+254')) {
+    return cleaned.substring(1)
+  }
+  
+  return cleaned
+}
+
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found'
+  })
+})
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('🚨 Unhandled Error:', error)
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error'
+  })
+})
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 SellHubShop Backend running on port ${PORT}`)
