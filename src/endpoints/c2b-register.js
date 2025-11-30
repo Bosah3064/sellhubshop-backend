@@ -1,4 +1,4 @@
-// register-simple.js
+// register-simple.js - FIXED VERSION
 require('dotenv').config();
 const axios = require('axios');
 
@@ -64,5 +64,8 @@ async function registerC2BUrls() {
   }
 }
 
-// Execute
-registerC2BUrls();
+// ❌ REMOVE THIS LINE - it's crashing your server:
+// registerC2BUrls();
+
+// ✅ Change to export instead (optional):
+module.exports = registerC2BUrls;
