@@ -15,7 +15,7 @@ app.use(cors({
 }));
 
 app.use(bodyParser.json());
-app.use('/endpoints', mPesaRoutes);
+app.use('/api', mPesaRoutes);
 
 app.get('/', (req, res) => res.send('M-Pesa API Server is running'));
 
