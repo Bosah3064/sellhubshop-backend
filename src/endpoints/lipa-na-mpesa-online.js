@@ -8,7 +8,7 @@ const moment = require('moment')
  * @param {Object} payload - The data required for Lipa Na Mpesa Online Payment
  * @see {@link https://developer.safaricom.co.ke/docs#lipa-na-m-pesa-online-request | Lipa Na Mpesa Online Request}
  */
-const lipaNaMpesaOnline = function (payload = {}) {
+const lipaNaMpesaOnline = async function (payload = {}) { // ✅ Changed to async
   try {
     const {
       BusinessShortCode = this.configs?.lipaNaMpesaShortCode,
@@ -71,11 +71,14 @@ const lipaNaMpesaOnline = function (payload = {}) {
       AccountReference: requestPayload.AccountReference
     })
 
-    return this.request({
-      url: '/mpesa/stkpush/v1/processrequest',
-      method: 'POST',
-      body: requestPayload
-    })
+    // ✅ FIX: Use await and proper request handling
+    const req = await this.request()
+    const response = await req.post('/mpesa/stkpush/v1/processrequest', requestPayload)
+    
+    console.log('✅ M-Pesa STK Push Response:', response.data)
+    
+    return response
+
   } catch (error) {
     console.error('❌ STK Push Initialization Error:', {
       message: error.message,
@@ -83,7 +86,8 @@ const lipaNaMpesaOnline = function (payload = {}) {
       config: {
         shortCode: this.configs?.lipaNaMpesaShortCode,
         hasPass: !!this.configs?.lipaNaMpesaShortPass
-      }
+      },
+      errorResponse: error.response?.data
     })
     throw error
   }

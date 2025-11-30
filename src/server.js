@@ -104,7 +104,7 @@ app.post('/api/stk-push', async (req, res) => {
   }
 })
 
-// NEW: Endpoint that your frontend is calling - FIXED
+// NEW: Endpoint that your frontend is calling - COMPLETELY FIXED
 app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
   try {
     console.log('📱 Frontend STK Push Request:', req.body)
@@ -158,47 +158,64 @@ app.post('/api/mpesa/initiate-stk-push', async (req, res) => {
       console.log('✅ Subscription record created:', subscriptionData)
     }
 
-    // ✅ CORRECT: Use object parameter format with proper STK Push payload
-    const response = await mpesa.lipaNaMpesaOnline({
-      Amount: amount,
-      PartyA: formattedPhone,
-      PhoneNumber: formattedPhone,
-      CallBackURL: callbackUrl,
-      AccountReference: reference,
-      TransactionDesc: `Payment for ${reference}`
-    })
+    // ✅ FIX: Better error handling for M-Pesa API call
+    let response;
+    try {
+      response = await mpesa.lipaNaMpesaOnline({
+        Amount: amount,
+        PartyA: formattedPhone,
+        PhoneNumber: formattedPhone,
+        CallBackURL: callbackUrl,
+        AccountReference: reference,
+        TransactionDesc: `Payment for ${reference}`
+      })
+      
+      console.log('✅ STK Push successful:', response?.data)
+      
+      // ✅ FIX: Check if response and response.data exist
+      if (!response || !response.data) {
+        throw new Error('M-Pesa returned empty response')
+      }
 
-    console.log('✅ STK Push successful:', response.data)
-    
-    // ✅ FIX: Extract checkoutRequestID from response.data (not response directly)
-    const checkoutRequestId = response.data.CheckoutRequestID;
-    const merchantRequestId = response.data.MerchantRequestID;
-    
-    console.log('🎯 Extracted M-Pesa IDs:', {
-      checkoutRequestId,
-      merchantRequestId
-    })
-    
-    // Update subscription with M-Pesa IDs
-    if (subscriptionData && subscriptionData[0]) {
-      await supabase
-        .from('subscriptions')
-        .update({
-          checkout_request_id: checkoutRequestId,
-          merchant_request_id: merchantRequestId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscriptionData[0].id)
+      // ✅ FIX: Extract checkoutRequestID safely
+      const checkoutRequestId = response.data.CheckoutRequestID;
+      const merchantRequestId = response.data.MerchantRequestID;
+      
+      console.log('🎯 Extracted M-Pesa IDs:', {
+        checkoutRequestId,
+        merchantRequestId
+      })
+      
+      if (!checkoutRequestId) {
+        throw new Error('CheckoutRequestID is missing from M-Pesa response')
+      }
+      
+      // Update subscription with M-Pesa IDs
+      if (subscriptionData && subscriptionData[0]) {
+        await supabase
+          .from('subscriptions')
+          .update({
+            checkout_request_id: checkoutRequestId,
+            merchant_request_id: merchantRequestId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', subscriptionData[0].id)
+      }
+      
+      // ✅ FIXED: Return checkoutRequestID to frontend
+      res.json({
+        success: true,
+        message: 'STK push initiated successfully',
+        checkoutRequestID: checkoutRequestId,
+        merchantRequestID: merchantRequestId,
+        data: response.data
+      })
+
+    } catch (mpesaError) {
+      console.error('❌ M-Pesa API Error:', mpesaError.message)
+      console.error('❌ M-Pesa Error Details:', mpesaError.response?.data)
+      throw new Error(`M-Pesa API failed: ${mpesaError.message}`)
     }
-    
-    // ✅ FIXED: Return checkoutRequestID to frontend
-    res.json({
-      success: true,
-      message: 'STK push initiated successfully',
-      checkoutRequestID: checkoutRequestId, // ✅ Now frontend gets this
-      merchantRequestID: merchantRequestId, // ✅ Add this too
-      data: response.data
-    })
 
   } catch (error) {
     console.error('❌ STK Push Error:', error.message)
@@ -406,6 +423,59 @@ app.post('/api/mpesa/check-status', async (req, res) => {
       success: false,
       message: 'Failed to check payment status',
       error: error.message
+    });
+  }
+});
+
+// ADD THIS: M-Pesa Debug Test Endpoint
+app.post('/api/debug/test-stk', async (req, res) => {
+  try {
+    const { phoneNumber, amount } = req.body;
+    
+    if (!mpesa) {
+      return res.status(503).json({
+        success: false,
+        message: 'M-Pesa service is not available'
+      });
+    }
+
+    const formattedPhone = formatPhoneNumber(phoneNumber || '254708374149');
+    const testAmount = amount || 1;
+    
+    console.log('🧪 Testing M-Pesa STK with:', { phone: formattedPhone, amount: testAmount });
+
+    // Test M-Pesa authentication first
+    const auth = await mpesa.oAuth();
+    console.log('🔑 M-Pesa Auth:', auth.data);
+
+    // Test STK push
+    const response = await mpesa.lipaNaMpesaOnline({
+      Amount: testAmount,
+      PartyA: formattedPhone,
+      PhoneNumber: formattedPhone,
+      CallBackURL: 'https://sellhubshop-backend.onrender.com/api/mpesa/callback',
+      AccountReference: 'DEBUG_TEST',
+      TransactionDesc: 'Debug Test'
+    });
+
+    console.log('✅ M-Pesa Test Successful:', response.data);
+    
+    res.json({
+      success: true,
+      message: 'M-Pesa test successful',
+      auth: auth.data,
+      stkResponse: response.data
+    });
+
+  } catch (error) {
+    console.error('❌ M-Pesa Test Failed:', error.message);
+    console.error('Error details:', error.response?.data);
+    
+    res.status(500).json({
+      success: false,
+      message: 'M-Pesa test failed',
+      error: error.message,
+      details: error.response?.data
     });
   }
 });
