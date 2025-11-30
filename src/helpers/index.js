@@ -1,7 +1,12 @@
-const request = require('./request')
-const security = require('./security')
+const axios = require('axios');
 
 module.exports = {
-  request,
-  security
-}
+    getAccessToken: async (consumerKey, consumerSecret, env) => {
+        const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+        const url = env === 'sandbox' 
+            ? 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+            : 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+        const response = await axios.get(url, { headers: { Authorization: `Basic ${auth}` } });
+        return response.data.access_token;
+    }
+};

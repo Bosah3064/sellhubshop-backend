@@ -1,33 +1,37 @@
-/**
- * B2C Payment Request
- * @name B2CRequest
- * @function
- * @description Use this API to transact between an M-Pesa short code to a phone number registered on M-Pesa.
- * @see {@link https://developer.safaricom.co.ke/b2c/apis/post/paymentrequest|B2C Payment Request}
- * @param  {number} senderParty                   Organization /MSISDN sending the transaction
- * @param  {number} receiverParty                 MSISDN receiving the transaction
- * @param  {number} amount                        The amount being transacted
- * @param  {string} queueUrl                      The path that stores information of time out transaction
- * @param  {string} resultUrl                     The path that stores information of transaction
- * @param  {string} [commandId='BusinessPayment'] Unique command for each transaction type [SalaryPayment|BusinessPayment|PromotionPayment]
- * @param  {string} [initiatorName=null]          The name of the initiator initiating the request
- * @param  {String} [remarks='B2C Payment']       Comments that are sent along with the transaction.
- * @param  {string} occasion
- * @return {Promise}
- */
-module.exports = async function (senderParty, receiverParty, amount, queueUrl, resultUrl, commandId = 'BusinessPayment', initiatorName = null, remarks = 'B2C Payment', occasion) {
-  const securityCredential = this.security()
-  const req = await this.request()
-  return req.post('/mpesa/b2c/v1/paymentrequest', {
-    'InitiatorName': initiatorName || this.configs.initiatorName,
-    'SecurityCredential': securityCredential,
-    'CommandID': commandId,
-    'Amount': amount,
-    'PartyA': senderParty,
-    'PartyB': receiverParty,
-    'Remarks': remarks,
-    'QueueTimeOutURL': queueUrl,
-    'ResultURL': resultUrl,
-    'Occasion': occasion
-  })
-}
+const express = require('express');
+const router = express.Router();
+const helpers = require('../helpers');
+const requestHelper = require('../helpers/request');
+const { MPESA_SHORTCODE, MPESA_ENV, MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET } = process.env;
+
+router.post('/', async (req, res) => {
+    const { amount, phone, remarks } = req.body;
+
+    try {
+        const token = await helpers.getAccessToken(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_ENV);
+
+        const b2cData = {
+            InitiatorName: "testapi",
+            SecurityCredential: "SECURITY_CREDENTIAL", // generate via Safaricom docs
+            CommandID: "BusinessPayment",
+            Amount: amount,
+            PartyA: MPESA_SHORTCODE,
+            PartyB: phone,
+            Remarks: remarks || "Payment",
+            QueueTimeOutURL: "https://example.com/b2c/timeout",
+            ResultURL: "https://example.com/b2c/result",
+            Occasion: "Payment"
+        };
+
+        const url = MPESA_ENV === 'sandbox'
+            ? 'https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest'
+            : 'https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest';
+
+        const response = await requestHelper.postRequest(url, b2cData, token);
+        res.json(response.data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+module.exports = router;

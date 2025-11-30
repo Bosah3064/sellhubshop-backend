@@ -1,54 +1,34 @@
-const moment = require('moment')
+const express = require('express');
+const router = express.Router();
+const helpers = require('../helpers');
+const requestHelper = require('../helpers/request');
+const security = require('../helpers/security');
+const { MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_ENV, MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET } = process.env;
 
-/**
- * Lipa Na M-Pesa Query Request API
- * @name LipaNaMpesaQuery
- * @description Use this API to check the status of a Lipa Na M-Pesa Online Payment.
- * @param  {string} checkoutRequestId Checkout RequestID
- * @param  {number} [shortCode=null]  Business Short Code
- * @param  {number} [timeStamp=null]  timeStamp
- * @param  {string} [passKey=null]    lipaNaMpesa Pass Key
- * @return {Promise}
- */
-module.exports = async function (checkoutRequestId, shortCode = null, passKey = null) {
-  try {
-    // ✅ Enhanced validation
-    if (!checkoutRequestId) {
-      throw new Error('checkoutRequestId is required')
+router.post('/', async (req, res) => {
+    const { checkoutRequestID } = req.body;
+
+    try {
+        const token = await helpers.getAccessToken(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_ENV);
+        const timestamp = security.getTimestamp();
+        const password = security.generatePassword(MPESA_SHORTCODE, MPESA_PASSKEY, timestamp);
+
+        const queryData = {
+            BusinessShortCode: MPESA_SHORTCODE,
+            Password: password,
+            Timestamp: timestamp,
+            CheckoutRequestID: checkoutRequestID
+        };
+
+        const url = MPESA_ENV === 'sandbox'
+            ? 'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query'
+            : 'https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query';
+
+        const response = await requestHelper.postRequest(url, queryData, token);
+        res.json(response.data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
+});
 
-    if (!this.configs?.lipaNaMpesaShortCode || !this.configs?.lipaNaMpesaShortPass) {
-      throw new Error('M-Pesa configuration is missing')
-    }
-
-    const _shortCode = shortCode || this.configs.lipaNaMpesaShortCode
-    const _passKey = passKey || this.configs.lipaNaMpesaShortPass
-    const timeStamp = moment().format('YYYYMMDDHHmmss')
-    const password = Buffer.from(`${_shortCode}${_passKey}${timeStamp}`).toString('base64')
-
-    console.log('🔍 STK Query Request:', {
-      BusinessShortCode: _shortCode,
-      CheckoutRequestID: checkoutRequestId,
-      Timestamp: timeStamp
-    })
-
-    const req = await this.request()
-    const response = await req.post('/mpesa/stkpushquery/v1/query', {
-      'BusinessShortCode': _shortCode,
-      'Password': password,
-      'Timestamp': timeStamp,
-      'CheckoutRequestID': checkoutRequestId
-    })
-
-    console.log('📊 STK Query Response:', response.data)
-    return response
-
-  } catch (error) {
-    console.error('❌ STK Query Error:', {
-      message: error.message,
-      checkoutRequestId: checkoutRequestId,
-      error: error.response?.data || error.message
-    })
-    throw error
-  }
-}
+module.exports = router;

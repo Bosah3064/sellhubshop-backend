@@ -1,10 +1,16 @@
-const axios = require('axios')
-module.exports = function (consumerKey, consumerSecret, baseURL = null) {
-  const auth = Buffer.from(consumerKey + ':' + consumerSecret).toString('base64')
-  return axios.get((baseURL || this.baseURL) + '/oauth/v1/generate?grant_type=client_credentials', {
-    headers: {
-      'Authorization': 'Basic ' + auth,
-      'content-type': 'application/json'
+const express = require('express');
+const router = express.Router();
+const helpers = require('../helpers');
+
+const { MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_ENV } = process.env;
+
+router.get('/', async (req, res) => {
+    try {
+        const token = await helpers.getAccessToken(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_ENV);
+        res.json({ access_token: token });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-  })
-}
+});
+
+module.exports = router;

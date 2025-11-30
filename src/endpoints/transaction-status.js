@@ -1,33 +1,36 @@
-/**
- * Transaction Status Request
- * @name TransactionStatus
- * @description Use this api to check the transaction status.
- * @function
- * @see {@link https://developer.safaricom.co.ke/transaction-status/apis/post/query| Transaction Status Request }
- * @param  {string} transactionId                        Unique identifier to identify a transaction on M-Pesa
- * @param  {number} receiverParty                        Organization/MSISDN receiving the transaction
- * @param  {number} idType                               Type of organization receiving the transaction
- * @param  {string} queueUrl                             The path that stores information of time out transaction
- * @param  {string} resultUrl                            The path that stores information of transaction
- * @param  {String} [remarks='TransactionReversal']      Comments that are sent along with the transaction
- * @param  {String} [occasion='TransactionReversal']     Optional Parameter
- * @param  {[type]} [initiator=null]                     The name of Initiator to initiating  the request
- * @param  {String} [commandId='TransactionStatusQuery'] Takes only 'TransactionStatusQuery' command id
- * @return {Promise}
- */
-module.exports = async function (transactionId, receiverParty, idType, queueUrl, resultUrl, remarks = 'TransactionReversal', occasion = 'TransactionReversal', initiator = null, commandId = 'TransactionStatusQuery') {
-  const securityCredential = this.security()
-  const req = await this.request()
-  return req.post('/mpesa/transactionstatus/v1/query', {
-    'Initiator': initiator || this.configs.initiatorName,
-    'SecurityCredential': securityCredential,
-    'CommandID': commandId,
-    'TransactionID': transactionId,
-    'PartyA': receiverParty,
-    'IdentifierType': idType,
-    'ResultURL': resultUrl,
-    'QueueTimeOutURL': queueUrl,
-    'Remarks': remarks,
-    'Occasion': occasion
-  })
-}
+const express = require('express');
+const router = express.Router();
+const helpers = require('../helpers');
+const requestHelper = require('../helpers/request');
+const { MPESA_SHORTCODE, MPESA_ENV, MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET } = process.env;
+
+router.post('/', async (req, res) => {
+    const { transactionID, remarks } = req.body;
+
+    try {
+        const token = await helpers.getAccessToken(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_ENV);
+
+        const txnStatusData = {
+            Initiator: "testapi",
+            SecurityCredential: "SECURITY_CREDENTIAL",
+            CommandID: "TransactionStatusQuery",
+            TransactionID: transactionID,
+            PartyA: MPESA_SHORTCODE,
+            IdentifierType: "4",
+            ResultURL: "https://example.com/transaction/result",
+            QueueTimeOutURL: "https://example.com/transaction/timeout",
+            Remarks: remarks || "Transaction Status"
+        };
+
+        const url = MPESA_ENV === 'sandbox'
+            ? 'https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query'
+            : 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query';
+
+        const response = await requestHelper.postRequest(url, txnStatusData, token);
+        res.json(response.data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+module.exports = router;

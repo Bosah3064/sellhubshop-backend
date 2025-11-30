@@ -1,8 +1,7 @@
-// security.js - SIMPLE PRODUCTION VERSION
-module.exports = (certPath, shortCodeSecurityCredential) => {
-  console.log('🔐 Using Production Security Credential');
-  
-  // In production, return the security credential directly
-  // No encryption needed - Safaricom handles this
-  return shortCodeSecurityCredential;
-}
+module.exports = {
+    generatePassword: (shortcode, passkey, timestamp) => Buffer.from(shortcode + passkey + timestamp).toString('base64'),
+    getTimestamp: () => {
+        const now = new Date();
+        return now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    }
+};
