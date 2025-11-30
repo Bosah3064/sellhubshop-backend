@@ -21,5 +21,8 @@ router.use('/lipa-query', lipaQuery);
 router.use('/oauth', oauth);
 router.use('/reversal', reversal);
 router.use('/transaction-status', txnStatus);
+const lipaStkPush = require('./endpoints/lipa-stk-push');
+router.use('/mpesa', lipaStkPush);
+
 
 module.exports = router;
