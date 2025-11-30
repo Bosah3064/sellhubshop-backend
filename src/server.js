@@ -27,18 +27,18 @@ app.use((req, res, next) => {
   next()
 })
 
-// Initialize M-Pesa with error handling - UPDATED CONFIGURATION
+// Initialize M-Pesa with error handling - UPDATED WITH SHORT CODE
 let mpesa
 try {
   mpesa = new Mpesa({
     consumerKey: process.env.MPESA_CONSUMER_KEY,
     consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-    // ✅ Use TILL NUMBER for STK Push
-    lipaNaMpesaShortCode: process.env.MPESA_TILL_NUMBER || 3188230,
+    // ✅ Use SHORT CODE for STK Push (3702683)
+    lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE || 3702683,
     lipaNaMpesaShortPass: process.env.MPESA_STK_PASSKEY || process.env.MPESA_PASSKEY,
-    environment: 'production' // Force production environment
+    environment: 'production'
   })
-  console.log('✅ M-Pesa initialized successfully with Till Number configuration')
+  console.log('✅ M-Pesa initialized successfully with Short Code configuration')
 } catch (error) {
   console.error('❌ M-Pesa initialization failed:', error.message)
 }
@@ -485,7 +485,7 @@ app.get('/api/debug/config', (req, res) => {
   res.json({
     environment: process.env.NODE_ENV,
     mpesaInitialized: !!mpesa,
-    stkShortCode: process.env.MPESA_TILL_NUMBER ? '✅ Till Number Set' : '❌ Till Number Missing',
+    stkShortCode: process.env.MPESA_SHORTCODE ? '✅ Short Code Set' : '❌ Short Code Missing',
     c2bShortCode: process.env.MPESA_SHORTCODE ? '✅ PayBill Set' : '❌ PayBill Missing',
     passkey: process.env.MPESA_PASSKEY ? '✅ Set' : '❌ Missing',
     consumerKey: process.env.MPESA_CONSUMER_KEY ? '✅ Set' : '❌ Missing',
@@ -614,7 +614,7 @@ app.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`📍 Health: https://sellhubshop-backend.onrender.com/api/health`)
   console.log(`🔑 M-Pesa Initialized: ${!!mpesa}`)
-  console.log(`🎯 STK ShortCode: ${process.env.MPESA_TILL_NUMBER || 3188230}`)
+  console.log(`🎯 STK ShortCode: ${process.env.MPESA_SHORTCODE || 3702683}`) // ✅ Updated to show Short Code
   console.log(`🗄️ Supabase Initialized: ${!!supabase}`)
 })
 

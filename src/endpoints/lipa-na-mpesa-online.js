@@ -8,11 +8,11 @@ const moment = require('moment')
  * @param {Object} payload - The data required for Lipa Na Mpesa Online Payment
  * @see {@link https://developer.safaricom.co.ke/docs#lipa-na-m-pesa-online-request | Lipa Na Mpesa Online Request}
  */
-const lipaNaMpesaOnline = async function (payload = {}) { // ✅ Changed to async
+const lipaNaMpesaOnline = async function (payload = {}) {
   try {
     const {
       BusinessShortCode = this.configs?.lipaNaMpesaShortCode,
-      TransactionType = 'CustomerBuyGoodsOnline',
+      TransactionType = 'CustomerPayBillOnline', // ✅ Changed for Short Code
       Amount,
       PartyA,
       PartyB = this.configs?.lipaNaMpesaShortCode,
@@ -38,7 +38,7 @@ const lipaNaMpesaOnline = async function (payload = {}) { // ✅ Changed to asyn
       throw new Error('M-Pesa configuration is missing or incomplete. Please check lipaNaMpesaShortCode and lipaNaMpesaShortPass.')
     }
 
-    // ✅ Generate password with TILL NUMBER
+    // ✅ Generate password with SHORT CODE
     const timestamp = moment().format('YYYYMMDDHHmmss')
     const password = Buffer.from(
       `${BusinessShortCode}${this.configs.lipaNaMpesaShortPass}${timestamp}`
@@ -52,14 +52,14 @@ const lipaNaMpesaOnline = async function (payload = {}) { // ✅ Changed to asyn
       BusinessShortCode: parseInt(BusinessShortCode),
       Password: password,
       Timestamp: timestamp,
-      TransactionType,
+      TransactionType, // ✅ Now 'CustomerPayBillOnline' for Short Code
       Amount: parseInt(Amount),
       PartyA: formattedPartyA,
       PartyB: parseInt(PartyB),
       PhoneNumber: formattedPhoneNumber,
       CallBackURL,
-      AccountReference: AccountReference?.toString().substring(0, 12) || 'Payment', // Truncate to 12 chars max
-      TransactionDesc: TransactionDesc?.toString().substring(0, 13) || 'Payment' // Truncate to 13 chars max
+      AccountReference: AccountReference?.toString().substring(0, 12) || 'Payment',
+      TransactionDesc: TransactionDesc?.toString().substring(0, 13) || 'Payment'
     }
 
     console.log('🎯 CORRECT STK Push Payload:', {
