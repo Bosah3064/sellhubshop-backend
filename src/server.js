@@ -442,7 +442,88 @@ function formatPhoneNumber(phone) {
   
   return cleaned
 }
+// ADD THIS ENDPOINT - Payment Status Check
+app.post('/api/mpesa/check-status', async (req, res) => {
+  try {
+    const { checkoutRequestId, reference } = req.body;
+    
+    console.log('🔍 Checking payment status:', { checkoutRequestId, reference });
+    
+    if (!checkoutRequestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'checkoutRequestId is required'
+      });
+    }
+    
+    if (!mpesa) {
+      return res.status(503).json({
+        success: false,
+        message: 'M-Pesa service is not available'
+      });
+    }
 
+    // Query M-Pesa for transaction status
+    const queryResult = await mpesa.lipaNaMpesaQuery(checkoutRequestId);
+    
+    console.log('📊 M-Pesa Query Result:', queryResult.data);
+    
+    // Check if we have a subscription to update
+    if (queryResult.data.ResultCode === '0') {
+      // Payment successful - update subscription
+      const { data: subscriptionData, error: updateError } = await supabase
+        .from('subscriptions')
+        .update({
+          status: 'active',
+          confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('checkout_request_id', checkoutRequestId)
+        .select();
+
+      if (updateError) {
+        console.error('❌ Failed to update subscription:', updateError);
+      } else {
+        console.log('✅ Subscription updated to active:', subscriptionData);
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: queryResult.data,
+      status: queryResult.data.ResultCode === '0' ? 'completed' : 'pending',
+      resultCode: queryResult.data.ResultCode,
+      resultDesc: queryResult.data.ResultDesc
+    });
+    
+  } catch (error) {
+    console.error('❌ Payment status check failed:', error.message);
+    
+    // Even if query fails, we can check database status
+    if (checkoutRequestId) {
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('status, mpesa_receipt_number')
+        .eq('checkout_request_id', checkoutRequestId)
+        .single();
+
+      if (subscription) {
+        return res.json({
+          success: true,
+          status: subscription.status,
+          mpesaReceiptNumber: subscription.mpesa_receipt_number,
+          message: 'Using database status'
+        });
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check payment status',
+      error: error.message
+    });
+  }
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 SellHubShop Backend running on port ${PORT}`)

@@ -85,7 +85,7 @@ const lipaNaMpesaOnline = function (payload = {}) {
         hasPass: !!this.configs?.lipaNaMpesaShortPass
       }
     })
-    throw error // Re-throw to let caller handle it
+    throw error
   }
 }
 
@@ -96,22 +96,18 @@ const lipaNaMpesaOnline = function (payload = {}) {
  */
 function formatPhoneNumber(phone) {
   try {
-    // ✅ Safety check for undefined/null
     if (phone === null || phone === undefined) {
       throw new Error('Phone number is null or undefined')
     }
 
-    // ✅ Convert to string safely
     const phoneString = phone.toString ? phone.toString() : String(phone)
     
-    // ✅ Check if string is empty after conversion
     if (!phoneString || phoneString.trim().length === 0) {
       throw new Error('Phone number is empty')
     }
 
     const cleaned = phoneString.replace(/\D/g, '')
     
-    // ✅ Validate the cleaned number
     if (!cleaned) {
       throw new Error('Phone number contains no digits')
     }
@@ -124,7 +120,6 @@ function formatPhoneNumber(phone) {
       throw new Error(`Phone number too long: ${cleaned}`)
     }
 
-    // ✅ Format the phone number
     if (cleaned.startsWith('0')) {
       return '254' + cleaned.substring(1)
     } else if (cleaned.startsWith('7') && cleaned.length === 9) {
@@ -133,14 +128,8 @@ function formatPhoneNumber(phone) {
       return cleaned
     } else if (cleaned.startsWith('+254')) {
       return cleaned.substring(1)
-    } else if (cleaned.startsWith('1') || cleaned.startsWith('2')) {
-      // Already in international format but might be missing 254
-      if (cleaned.length === 9) {
-        return '254' + cleaned
-      }
     }
     
-    // ✅ Return as-is with warning if format is unexpected
     console.warn(`⚠️ Unexpected phone number format: ${cleaned}. Using as-is.`)
     return cleaned
     
