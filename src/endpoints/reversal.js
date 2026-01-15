@@ -30,7 +30,21 @@ router.post('/', async (req, res) => {
         const response = await requestHelper.postRequest(url, reversalData, token);
         res.json(response.data);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[M-Pesa Reversal] Error:', err.message);
+        if (err.response && err.response.data) {
+            console.error('[M-Pesa Reversal] Safaricom Error:', err.response.data);
+            return res.status(200).json({
+                ...err.response.data,
+                success: false,
+                status: 'failed',
+                error: err.response.data.errorMessage || 'Reversal failed'
+            });
+        }
+        res.status(200).json({
+            success: false,
+            status: 'failed',
+            error: err.message || 'Internal server error'
+        });
     }
 });
 

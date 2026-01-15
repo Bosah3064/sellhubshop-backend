@@ -21,5 +21,8 @@
     "sellhubshop"
   ],
   "author": "Lameck",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "localtunnel": "^2.0.2"
+  }
 }

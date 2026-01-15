@@ -1,0 +1,64 @@
+[
+  {
+    "error": null,
+    "data": [],
+    "count": null,
+    "status": 200,
+    "statusText": "OK"
+  },
+  {
+    "error": null,
+    "data": [
+      {
+        "id": "d5b054ad-d15e-4a05-b8d2-90e450299717",
+        "email": "lame3064@gmail.com",
+        "role": "super_admin",
+        "created_at": "2025-11-10T22:04:50.064605+00:00",
+        "permissions": {
+          "manage_users": true,
+          "manage_admins": true,
+          "manage_content": true,
+          "manage_reports": true,
+          "view_analytics": true,
+          "manage_products": true,
+          "manage_settings": true,
+          "manage_categories": true
+        },
+        "is_active": true,
+        "updated_at": "2026-01-13T09:27:46.001+00:00",
+        "user_id": "c12a1d8d-b380-4e44-b39b-51ad55c71fa1",
+        "can_manage_admins": true,
+        "can_manage_users": true,
+        "can_manage_products": true,
+        "can_manage_categories": true,
+        "can_manage_reports": true,
+        "can_manage_settings": true,
+        "can_view_analytics": true,
+        "can_manage_content": true,
+        "two_factor_enabled": false,
+        "two_factor_method": "none",
+        "last_login_at": "2026-01-13T09:27:46.001+00:00",
+        "security_questions": {},
+        "trusted_devices": [],
+        "login_notifications": true,
+        "two_factor_secret": null,
+        "backup_codes": []
+      }
+    ],
+    "count": null,
+    "status": 200,
+    "statusText": "OK"
+  },
+  {
+    "error": null,
+    "data": [
+      {
+        "id": "c12a1d8d-b380-4e44-b39b-51ad55c71fa1",
+        "email": "lame3064@gmail.com"
+      }
+    ],
+    "count": null,
+    "status": 200,
+    "statusText": "OK"
+  }
+]

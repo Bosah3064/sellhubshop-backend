@@ -1,7 +1,11 @@
+const moment = require('moment');
+
 module.exports = {
     generatePassword: (shortcode, passkey, timestamp) => Buffer.from(shortcode + passkey + timestamp).toString('base64'),
     getTimestamp: () => {
-        const now = new Date();
-        return now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+        // Enforce Nairobi time (UTC+3) format YYYYMMDDHHmmss
+        const timestamp = moment().utcOffset(3).format('YYYYMMDDHHmmss');
+        console.log('[Security] Generated Timestamp:', timestamp);
+        return timestamp;
     }
 };

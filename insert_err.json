@@ -1,0 +1,6 @@
+{
+  "code": "23502",
+  "details": "Failing row contains (6d14b686-ef58-4e76-8ae2-0dd9dc6d0bf2, c12a1d8d-b380-4e44-b39b-51ad55c71fa1, null, 1, KES, completed, null, null, null, Test, 2026-01-14 10:42:09.28857+00, 2026-01-14 10:42:09.28857+00).",
+  "hint": null,
+  "message": "null value in column \"payment_method\" of relation \"billing_history\" violates not-null constraint"
+}

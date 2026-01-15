@@ -29,7 +29,21 @@ router.post('/', async (req, res) => {
         const response = await requestHelper.postRequest(url, txnStatusData, token);
         res.json(response.data);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[M-Pesa Status] Error:', err.message);
+        if (err.response && err.response.data) {
+            console.error('[M-Pesa Status] Safaricom Error:', err.response.data);
+            return res.status(200).json({
+                ...err.response.data,
+                success: false,
+                status: 'failed',
+                error: err.response.data.errorMessage || 'Transaction status check failed'
+            });
+        }
+        res.status(200).json({
+            success: false,
+            status: 'failed',
+            error: err.message || 'Internal server error'
+        });
     }
 });
 
