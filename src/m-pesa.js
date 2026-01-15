@@ -26,7 +26,7 @@ router.use('/b2c', authMiddleware, b2c);
 router.use('/b2b', authMiddleware, b2b);
 
 // C2B Public Callbacks (MUST be public)
-router.use('/c2b', c2bCallback);
+router.use('/v1/c2b', c2bCallback);
 
 // STK Push Initiation (Authenticated) & Callback (Public - inside the module)
 // Note: lipa-na-mpesa-online.js handles its own routing. 
@@ -37,14 +37,13 @@ router.use('/c2b', c2bCallback);
 // We will add authMiddleware inside the specific initiates route in lipa-na-mpesa-online.js if strictly needed, 
 // but for now, let's open it up to unblock the callback.
 // Mount lipa handler to support both initiation (/stk-push) and callback (/callback)
-// This ensures that /api/mpesa/callback (from .env) works correctly
-router.use('/mpesa/stk-push', lipa); // Alias for initiation (Must be first!)
-router.use('/mpesa', lipa); // General mount (supports /callback)
+// This ensures that /api/v1/callback (from .env) works correctly
+router.use('/v1/stk-push', lipa); // Alias for initiation
+router.use('/v1', lipa); // General mount (supports /callback)
 router.use('/lipa', lipa);
 
-
 router.use('/lipa-query', authMiddleware, lipaQuery);
-router.use('/mpesa/query', authMiddleware, lipaQuery); // Alias
+router.use('/v1/query', authMiddleware, lipaQuery); // Alias
 router.use('/oauth', oauth); // OAuth might be internal/public depending on use case
 router.use('/reversal', authMiddleware, reversal);
 router.use('/transaction-status', authMiddleware, txnStatus);
