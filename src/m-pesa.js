@@ -15,6 +15,7 @@ const lipaQuery = require('./endpoints/lipa-na-mpesa-query');
 const oauth = require('./endpoints/oauth');
 const reversal = require('./endpoints/reversal');
 const txnStatus = require('./endpoints/transaction-status');
+const c2bCallback = require('./endpoints/c2b-callback');
 
 // Routes
 
@@ -23,6 +24,9 @@ router.use('/c2b/register', authMiddleware, c2b);
 router.use('/c2b/simulate', authMiddleware, c2bSim);
 router.use('/b2c', authMiddleware, b2c);
 router.use('/b2b', authMiddleware, b2b);
+
+// C2B Public Callbacks (MUST be public)
+router.use('/c2b', c2bCallback);
 
 // STK Push Initiation (Authenticated) & Callback (Public - inside the module)
 // Note: lipa-na-mpesa-online.js handles its own routing. 
