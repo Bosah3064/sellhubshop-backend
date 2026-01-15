@@ -24,8 +24,8 @@ router.post('/', async (req, res) => {
         };
 
         const url = MPESA_ENV === 'sandbox'
-            ? 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl'
-            : 'https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl';
+            ? 'https://sandbox.safaricom.co.ke/mpesa/c2b/v2/registerurl'
+            : 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl';
 
         console.log(`[M-Pesa C2B] Requesting ${url} with payload:`, registrationData);
 

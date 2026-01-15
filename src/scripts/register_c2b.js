@@ -35,8 +35,8 @@ async function registerC2B() {
         };
 
         const url = MPESA_ENV === 'sandbox'
-            ? 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl'
-            : 'https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl';
+            ? 'https://sandbox.safaricom.co.ke/mpesa/c2b/v2/registerurl'
+            : 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl';
 
         console.log(`\n[2/2] Registering URLs at ${url}...`);
         console.log('Using Headers:', { Authorization: `Bearer ${token.substring(0, 5)}...` });
