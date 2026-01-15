@@ -39,6 +39,8 @@ async function registerC2B() {
             : 'https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl';
 
         console.log(`\n[2/2] Registering URLs at ${url}...`);
+        console.log('Using Headers:', { Authorization: `Bearer ${token.substring(0, 5)}...` });
+
         const response = await requestHelper.postRequest(url, registrationData, token);
 
         console.log('\n--- SUCCESS ---');
