@@ -21,6 +21,15 @@ app.use('/api', mPesaRoutes);
 const referralsRoutes = require('./endpoints/referrals');
 app.use('/api/referrals', referralsRoutes);
 
+// Email endpoint
+const emailRoutes = require('./endpoints/email');
+app.use('/api/email', emailRoutes);
+
+// Admin Management endpoint
+const adminRoutes = require('./endpoints/admin');
+app.use('/api/admin', adminRoutes);
+
+
 app.get('/', (req, res) => res.send('M-Pesa API Server is running'));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
