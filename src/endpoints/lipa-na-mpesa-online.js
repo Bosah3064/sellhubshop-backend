@@ -310,7 +310,8 @@ router.post('/callback', async (req, res) => {
                 .from('subscriptions')
                 .update({
                     status: 'failed',
-                    failure_reason: ResultDesc || 'M-Pesa Transaction Failed'
+                    failure_reason: ResultDesc || 'M-Pesa Transaction Failed',
+                    mpesa_receipt_number: CheckoutRequestID // Store CheckoutID as Ref for failures
                 })
                 .eq('checkout_request_id', CheckoutRequestID)
                 .select('user_id, plan_id, amount')
@@ -342,6 +343,7 @@ router.post('/callback', async (req, res) => {
                     status: historyStatus,
                     description: `Failed Prompt: ${planName} plan (${ResultDesc || 'No reason provided'})`,
                     payment_method: 'mpesa',
+                    mpesa_receipt_number: CheckoutRequestID, // Store CheckoutID as Ref
                     created_at: new Date().toISOString()
                 });
             }
