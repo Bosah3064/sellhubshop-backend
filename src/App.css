@@ -1,0 +1,83 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, hsl(142 30% 98%), hsl(142 30% 95%));
+  min-height: 80vh;
+  border-radius: 12px;
+  border: 1px solid hsl(142 30% 85%);
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: all 300ms;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 4px 15px rgba(0, 126, 58, 0.2);
+  border: 2px solid hsl(142 30% 85%);
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em hsl(142 100% 35%));
+  transform: scale(1.05);
+  border-color: hsl(142 100% 28%);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em hsl(20 100% 55%));
+  border-color: hsl(20 100% 50%);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+    border: 3px solid hsl(142 100% 28%);
+  }
+}
+
+.card {
+  padding: 2em;
+  background: white;
+  border-radius: 0.75rem;
+  border-left: 4px solid hsl(142 100% 28%);
+  box-shadow: 0 4px 15px rgba(0, 126, 58, 0.1);
+  margin: 1rem 0;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 126, 58, 0.15);
+  border-left: 4px solid hsl(20 100% 50%);
+}
+
+.read-the-docs {
+  color: hsl(142 20% 40%);
+  font-weight: 500;
+}
+
+/* Safaricom specific utility classes */
+.safaricom-primary {
+  background: hsl(142 100% 28%);
+  color: white;
+}
+
+.safaricom-secondary {
+  background: hsl(20 100% 50%);
+  color: white;
+}
+
+.safaricom-accent {
+  background: hsl(45 100% 51%);
+  color: hsl(142 100% 20%);
+}
