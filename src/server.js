@@ -25,6 +25,10 @@ app.use('/api/referrals', referralsRoutes);
 const emailRoutes = require('./endpoints/email');
 app.use('/api/email', emailRoutes);
 
+// Share endpoint (Social Media Logic)
+const shareRoutes = require('./endpoints/share');
+app.use('/api/share', shareRoutes);
+
 // Admin Management endpoint
 const adminRoutes = require('./endpoints/admin');
 app.use('/api/admin', adminRoutes);
