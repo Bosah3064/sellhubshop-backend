@@ -36,7 +36,14 @@ router.get('/product/:id', async (req, res) => {
 
         const sellerName = seller ? (seller.full_name || seller.username) : 'MarketHub Seller';
         const price = formatCurrency(product.price);
-        const imageUrl = product.images && product.images.length > 0 ? product.images[0] : 'https://sellhubshop.co.ke/placeholder.svg';
+
+        let imageUrl = product.images && product.images.length > 0 ? product.images[0] : 'https://sellhubshop.co.ke/placeholder.svg';
+
+        // Fix for protocol-relative URLs (starting with //) which some social bots don't handle
+        if (imageUrl && imageUrl.startsWith('//')) {
+            imageUrl = 'https:' + imageUrl;
+        }
+
         const title = `${product.name} - ${price}`;
         const description = product.description
             ? product.description.substring(0, 150) + (product.description.length > 150 ? '...' : '')
