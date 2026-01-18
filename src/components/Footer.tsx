@@ -292,10 +292,10 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="bg-gradient-to-b from-gray-50 to-white border-t border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer className="bg-gradient-to-b from-gray-50 to-white border-t border-gray-200 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Top Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {/* Brand Section */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -399,8 +399,8 @@ export default function Footer() {
                 <Button
                   onClick={handleInstallPWA}
                   className={`w-full rounded-xl p-4 h-auto transition-all duration-200 hover:shadow-lg ${isInstallable
-                      ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
-                      : "bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white"
+                    ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                    : "bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white"
                     }`}
                 >
                   <div className="flex items-center gap-3 w-full justify-center">
@@ -432,14 +432,14 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Links Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
+        {/* Links Grid - Mobile optimized */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {footerSections.map((section) => (
-            <div key={section.title}>
-              <h4 className={`font-semibold text-gray-900 mb-4 text-sm ${section.title === "Trending" ? "text-primary animate-neon-pop" : ""}`}>
+            <div key={section.title} className="mb-2 sm:mb-0">
+              <h4 className={`font-semibold text-gray-900 mb-3 sm:mb-4 text-sm ${section.title === "Trending" ? "text-primary animate-neon-pop" : ""}`}>
                 {section.title}
               </h4>
-              <ul className="space-y-3">
+              <ul className="space-y-2 sm:space-y-3">
                 {section.links.map((link) => (
                   <li key={link.name}>
                     <button
@@ -507,8 +507,8 @@ export default function Footer() {
         </div>
 
         {/* Bottom Section */}
-        <div className="border-t border-gray-200 pt-8">
-          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+        <div className="border-t border-gray-200 pt-6 sm:pt-8">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-4 sm:gap-6">
             {/* Copyright */}
             <div className="text-center lg:text-left">
               <p className="text-gray-600 text-sm">
@@ -534,8 +534,8 @@ export default function Footer() {
           </div>
 
           {/* Payment Methods */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               <span className="text-sm text-gray-600 font-medium">
                 Accepted Payment Methods:
               </span>

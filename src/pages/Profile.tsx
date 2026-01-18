@@ -197,12 +197,12 @@ const useProfileData = (email?: string, id?: string) => {
             error
               ? []
               : (data || []).map((item) => ({
-                  id: item.id,
-                  follower_id: item.follower_id,
-                  following_id: item.following_id,
-                  created_at: item.created_at,
-                  user: item.follower,
-                }))
+                id: item.id,
+                follower_id: item.follower_id,
+                following_id: item.following_id,
+                created_at: item.created_at,
+                user: item.follower,
+              }))
           ),
 
         supabase
@@ -222,12 +222,12 @@ const useProfileData = (email?: string, id?: string) => {
             error
               ? []
               : (data || []).map((item) => ({
-                  id: item.id,
-                  follower_id: item.follower_id,
-                  following_id: item.following_id,
-                  created_at: item.created_at,
-                  user: item.following,
-                }))
+                id: item.id,
+                follower_id: item.follower_id,
+                following_id: item.following_id,
+                created_at: item.created_at,
+                user: item.following,
+              }))
           ),
 
         supabase
@@ -250,9 +250,9 @@ const useProfileData = (email?: string, id?: string) => {
             error
               ? 0
               : data?.reduce(
-                  (sum, product) => sum + (product.views_count || 0),
-                  0
-                ) || 0
+                (sum, product) => sum + (product.views_count || 0),
+                0
+              ) || 0
           ),
       ]);
 
@@ -365,17 +365,16 @@ export default function Profile() {
       const profileUrl = profile?.id
         ? `${window.location.origin}/profile/${profile.id}`
         : email
-        ? `${window.location.origin}/profile/email/${encodeURIComponent(
+          ? `${window.location.origin}/profile/email/${encodeURIComponent(
             email!
           )}`
-        : window.location.href;
+          : window.location.href;
 
       if (navigator.share) {
         await navigator.share({
           title: `Check out ${profile?.full_name || profile?.email}'s profile`,
-          text: `View ${
-            profile?.full_name || profile?.email
-          }'s products on Marketplace`,
+          text: `View ${profile?.full_name || profile?.email
+            }'s products on Marketplace`,
           url: profileUrl,
         });
         toast.success("Profile shared! 🚀");
@@ -529,155 +528,154 @@ export default function Profile() {
   // Enhanced Professional Stats with Safaricom Theme
   const ProfessionalStats = useMemo(
     () => () =>
-      (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="p-4 text-center bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 cursor-pointer hover:shadow-lg transition-all hover:scale-105">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <ShoppingBag className="w-5 h-5 text-blue-600" />
-              <div className="text-2xl font-bold text-blue-600">
-                {stats?.total_products || 0}
-              </div>
+    (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card className="p-4 text-center bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 cursor-pointer hover:shadow-lg transition-all hover:scale-105">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <ShoppingBag className="w-5 h-5 text-blue-600" />
+            <div className="text-2xl font-bold text-blue-600">
+              {stats?.total_products || 0}
             </div>
-            <div className="text-sm font-semibold text-blue-700">Products</div>
-          </Card>
+          </div>
+          <div className="text-sm font-semibold text-blue-700">Products</div>
+        </Card>
 
-          <Card
-            className="p-4 text-center bg-gradient-to-br from-green-50 to-green-100 border-green-200 cursor-pointer hover:shadow-lg transition-all hover:scale-105"
-            onClick={() => handleViewNetwork("followers")}
-          >
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Users className="w-5 h-5 text-green-600" />
-              <div className="text-2xl font-bold text-green-600">
-                {stats?.followers_count || 0}
-              </div>
+        <Card
+          className="p-4 text-center bg-gradient-to-br from-green-50 to-green-100 border-green-200 cursor-pointer hover:shadow-lg transition-all hover:scale-105"
+          onClick={() => handleViewNetwork("followers")}
+        >
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Users className="w-5 h-5 text-green-600" />
+            <div className="text-2xl font-bold text-green-600">
+              {stats?.followers_count || 0}
             </div>
-            <div className="text-sm font-semibold text-green-700">
-              Followers
-            </div>
-          </Card>
+          </div>
+          <div className="text-sm font-semibold text-green-700">
+            Followers
+          </div>
+        </Card>
 
-          <Card
-            className="p-4 text-center bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 cursor-pointer hover:shadow-lg transition-all hover:scale-105"
-            onClick={() => handleViewNetwork("following")}
-          >
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <UserPlus className="w-5 h-5 text-purple-600" />
-              <div className="text-2xl font-bold text-purple-600">
-                {stats?.following_count || 0}
-              </div>
+        <Card
+          className="p-4 text-center bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 cursor-pointer hover:shadow-lg transition-all hover:scale-105"
+          onClick={() => handleViewNetwork("following")}
+        >
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <UserPlus className="w-5 h-5 text-purple-600" />
+            <div className="text-2xl font-bold text-purple-600">
+              {stats?.following_count || 0}
             </div>
-            <div className="text-sm font-semibold text-purple-700">
-              Following
-            </div>
-          </Card>
+          </div>
+          <div className="text-sm font-semibold text-purple-700">
+            Following
+          </div>
+        </Card>
 
-          <Card className="p-4 text-center bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-all hover:scale-105">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-              <div className="text-2xl font-bold text-orange-600">
-                {stats?.average_rating || "5.0"}
-              </div>
+        <Card className="p-4 text-center bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-all hover:scale-105">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+            <div className="text-2xl font-bold text-orange-600">
+              {stats?.average_rating || "5.0"}
             </div>
-            <div className="text-sm font-semibold text-orange-700">Rating</div>
-          </Card>
-        </div>
-      ),
+          </div>
+          <div className="text-sm font-semibold text-orange-700">Rating</div>
+        </Card>
+      </div>
+    ),
     [stats]
   );
 
   // Enhanced Contact Buttons with Safaricom Theme
   const EnhancedContactButtons = useMemo(
     () => () =>
-      (
-        <div className="flex flex-col md:flex-row gap-3 justify-center md:justify-start items-center">
-          {!isOwnProfile && currentUser && (
-            <Button
-              onClick={handleFollow}
-              size="sm"
-              className={`font-semibold transition-all shadow-lg ${
-                isFollowing
-                  ? "bg-green-600 hover:bg-green-700 text-white border-0"
-                  : "bg-white text-green-600 border-2 border-green-600 hover:bg-green-50"
+    (
+      <div className="flex flex-col md:flex-row gap-3 justify-center md:justify-start items-center">
+        {!isOwnProfile && currentUser && (
+          <Button
+            onClick={handleFollow}
+            size="sm"
+            className={`font-semibold transition-all shadow-lg ${isFollowing
+                ? "bg-green-600 hover:bg-green-700 text-white border-0"
+                : "bg-white text-green-600 border-2 border-green-600 hover:bg-green-50"
               }`}
+          >
+            <Heart
+              className={`w-4 h-4 mr-2 ${isFollowing ? "fill-current" : ""}`}
+            />
+            {isFollowing ? "Following" : "Follow"}
+          </Button>
+        )}
+
+        <div className="flex flex-wrap gap-2 justify-center">
+          {profile?.whatsapp && (
+            <Button
+              onClick={() => handleContact("whatsapp")}
+              size="sm"
+              className="bg-green-500 hover:bg-green-600 text-white shadow-lg border-0"
             >
-              <Heart
-                className={`w-4 h-4 mr-2 ${isFollowing ? "fill-current" : ""}`}
-              />
-              {isFollowing ? "Following" : "Follow"}
+              <MessageCircle className="w-4 h-4 mr-2" />
+              WhatsApp
             </Button>
           )}
 
-          <div className="flex flex-wrap gap-2 justify-center">
-            {profile?.whatsapp && (
-              <Button
-                onClick={() => handleContact("whatsapp")}
-                size="sm"
-                className="bg-green-500 hover:bg-green-600 text-white shadow-lg border-0"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                WhatsApp
-              </Button>
-            )}
-
-            {profile?.phone && (
-              <Button
-                onClick={() => handleContact("phone")}
-                size="sm"
-                className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg border-0"
-              >
-                <Phone className="w-4 h-4 mr-2" />
-                Call
-              </Button>
-            )}
-
+          {profile?.phone && (
             <Button
-              onClick={() => handleContact("email")}
+              onClick={() => handleContact("phone")}
               size="sm"
-              className="bg-purple-500 hover:bg-purple-600 text-white shadow-lg border-0"
+              className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg border-0"
             >
-              <Mail className="w-4 h-4 mr-2" />
-              Email
+              <Phone className="w-4 h-4 mr-2" />
+              Call
             </Button>
+          )}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg border-0"
-                >
-                  {copied ? (
-                    <Check className="w-4 h-4 mr-2" />
-                  ) : (
-                    <Share2 className="w-4 h-4 mr-2" />
-                  )}
-                  {copied ? "Copied!" : "Share"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-xl">
-                <DropdownMenuItem
-                  onClick={handleShare}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-green-50 cursor-pointer transition-colors"
-                >
-                  <Share2 className="w-4 h-4 text-green-600" />
-                  <span className="font-semibold text-green-700">
-                    Share Profile
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleShare}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
-                >
-                  <Copy className="w-4 h-4 text-blue-600" />
-                  <span className="font-semibold text-blue-700">
-                    Copy Profile Link
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <Button
+            onClick={() => handleContact("email")}
+            size="sm"
+            className="bg-purple-500 hover:bg-purple-600 text-white shadow-lg border-0"
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Email
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg border-0"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 mr-2" />
+                ) : (
+                  <Share2 className="w-4 h-4 mr-2" />
+                )}
+                {copied ? "Copied!" : "Share"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-xl">
+              <DropdownMenuItem
+                onClick={handleShare}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-green-50 cursor-pointer transition-colors"
+              >
+                <Share2 className="w-4 h-4 text-green-600" />
+                <span className="font-semibold text-green-700">
+                  Share Profile
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleShare}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
+              >
+                <Copy className="w-4 h-4 text-blue-600" />
+                <span className="font-semibold text-blue-700">
+                  Copy Profile Link
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      ),
+      </div>
+    ),
     [isOwnProfile, currentUser, isFollowing, profile, copied]
   );
 
@@ -685,137 +683,171 @@ export default function Profile() {
   const EnhancedUserCard = useMemo(
     () =>
       ({ user, showActions = true }: { user: any; showActions?: boolean }) =>
-        (
-          <Card className="p-4 hover:shadow-xl transition-all border-0 shadow-lg bg-gradient-to-br from-white to-green-50/30 group hover:scale-105">
-            <div className="flex items-center gap-4">
-              <Avatar
-                className="w-14 h-14 cursor-pointer border-2 border-green-200 group-hover:border-green-400 transition-all"
+      (
+        <Card className="p-4 hover:shadow-xl transition-all border-0 shadow-lg bg-gradient-to-br from-white to-green-50/30 group hover:scale-105">
+          <div className="flex items-center gap-4">
+            <Avatar
+              className="w-14 h-14 cursor-pointer border-2 border-green-200 group-hover:border-green-400 transition-all"
+              onClick={() => navigate(`/profile/${user.id}`)}
+            >
+              <AvatarImage src={user.avatar_url || ""} />
+              <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-semibold">
+                {user.full_name?.charAt(0) || user.username?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="flex-1 min-w-0">
+              <div
+                className="cursor-pointer"
                 onClick={() => navigate(`/profile/${user.id}`)}
               >
-                <AvatarImage src={user.avatar_url || ""} />
-                <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-semibold">
-                  {user.full_name?.charAt(0) || user.username?.charAt(0) || "U"}
-                </AvatarFallback>
-              </Avatar>
-
-              <div className="flex-1 min-w-0">
-                <div
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/profile/${user.id}`)}
-                >
-                  <h3 className="font-bold text-base truncate text-gray-900">
-                    {user.full_name || "Unknown User"}
-                  </h3>
-                  {user.username && (
-                    <p className="text-sm text-muted-foreground">
-                      @{user.username}
-                    </p>
-                  )}
-                  {user.bio && (
-                    <p className="text-sm text-gray-700 line-clamp-2 mt-2 leading-relaxed">
-                      {user.bio}
-                    </p>
-                  )}
-                </div>
+                <h3 className="font-bold text-base truncate text-gray-900">
+                  {user.full_name || "Unknown User"}
+                </h3>
+                {user.username && (
+                  <p className="text-sm text-muted-foreground">
+                    @{user.username}
+                  </p>
+                )}
+                {user.bio && (
+                  <p className="text-sm text-gray-700 line-clamp-2 mt-2 leading-relaxed">
+                    {user.bio}
+                  </p>
+                )}
               </div>
-
-              {showActions && currentUser && currentUser.id !== user.id && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleFollowUser(user.id)}
-                  className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg border-0"
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Follow
-                </Button>
-              )}
             </div>
-          </Card>
-        ),
+
+            {showActions && currentUser && currentUser.id !== user.id && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleFollowUser(user.id)}
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg border-0"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Follow
+              </Button>
+            )}
+          </div>
+        </Card>
+      ),
     [currentUser, navigate]
   );
+
+  // Share function for ProductCard
+  const handleProductShare = async (e: React.MouseEvent, product: Product) => {
+    e.stopPropagation(); // Prevent card click
+    try {
+      const baseUrl = window.location.origin;
+      const shareUrl = `${baseUrl}/api/share/product/${product.id}`;
+      const shareText = `Check out "${product.name}" for ${formatPrice(product.price)} on MarketHub!`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: product.name,
+          text: shareText,
+          url: shareUrl,
+        });
+        toast.success("Product shared!");
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Link copied to clipboard!");
+      }
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("AbortError")) {
+        toast.error("Failed to share product");
+      }
+    }
+  };
 
   // Enhanced Product Card with Safaricom Theme
   const ProductCard = useMemo(
     () =>
       ({ product }: { product: Product }) =>
-        (
-          <Card
-            className="overflow-hidden hover:shadow-2xl transition-all cursor-pointer border-0 shadow-lg group bg-gradient-to-br from-white to-green-50/30"
-            onClick={() => handleViewProduct(product.id)}
-          >
-            <div className="aspect-square overflow-hidden bg-muted/30 relative">
-              {product.video_url ? (
-                <div className="w-full h-full relative">
-                  <video
-                    src={product.video_url}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    muted
-                    loop
-                    preload="metadata"
-                  />
-                  <div className="absolute top-3 left-3">
-                    <Badge className="bg-black/80 text-white text-xs border-0 shadow-lg">
-                      <Play className="w-3 h-3 mr-1" />
-                      Video
-                    </Badge>
-                  </div>
-                </div>
-              ) : (
-                <img
-                  src={product.images?.[0] || "/placeholder.svg"}
-                  alt={product.name}
+      (
+        <Card
+          className="overflow-hidden hover:shadow-2xl transition-all cursor-pointer border-0 shadow-lg group bg-gradient-to-br from-white to-green-50/30"
+          onClick={() => handleViewProduct(product.id)}
+        >
+          <div className="aspect-square overflow-hidden bg-muted/30 relative">
+            {product.video_url ? (
+              <div className="w-full h-full relative">
+                <video
+                  src={product.video_url}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  loading="lazy"
+                  muted
+                  loop
+                  preload="metadata"
                 />
-              )}
+                <div className="absolute top-3 left-3">
+                  <Badge className="bg-black/80 text-white text-xs border-0 shadow-lg">
+                    <Play className="w-3 h-3 mr-1" />
+                    Video
+                  </Badge>
+                </div>
+              </div>
+            ) : (
+              <img
+                src={product.images?.[0] || "/placeholder.svg"}
+                alt={product.name}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+              />
+            )}
 
-              {/* Enhanced Product Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                <div className="text-white">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Eye className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                      {product.views_count || 0}
-                    </span>
-                    <Heart className="w-4 h-4 ml-2" />
-                    <span className="text-sm font-medium">
-                      {product.likes_count || 0}
-                    </span>
-                  </div>
+            {/* Enhanced Product Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 justify-between">
+              <div className="text-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <Eye className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    {product.views_count || 0}
+                  </span>
+                  <Heart className="w-4 h-4 ml-2" />
+                  <span className="text-sm font-medium">
+                    {product.likes_count || 0}
+                  </span>
+                </div>
+              </div>
+              <Button
+                size="icon"
+                variant="secondary"
+                className="rounded-full shadow-lg hover:bg-white hover:text-green-600 transition-colors"
+                onClick={(e) => handleProductShare(e, product)}
+              >
+                <Share2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-4">
+            <h3 className="font-bold text-base mb-2 line-clamp-2 text-gray-900">
+              {product.name}
+            </h3>
+            <p className="text-xl font-bold text-green-600 mb-3">
+              {formatPrice(product.price)}
+            </p>
+            <div className="flex items-center justify-between">
+              <Badge
+                variant="secondary"
+                className="bg-blue-100 text-blue-700 border-blue-200 text-xs"
+              >
+                {product.condition}
+              </Badge>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Eye className="w-3 h-3" />
+                  <span>{product.views_count || 0}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Heart className="w-3 h-3" />
+                  <span>{product.likes_count || 0}</span>
                 </div>
               </div>
             </div>
-
-            <div className="p-4">
-              <h3 className="font-bold text-base mb-2 line-clamp-2 text-gray-900">
-                {product.name}
-              </h3>
-              <p className="text-xl font-bold text-green-600 mb-3">
-                {formatPrice(product.price)}
-              </p>
-              <div className="flex items-center justify-between">
-                <Badge
-                  variant="secondary"
-                  className="bg-blue-100 text-blue-700 border-blue-200 text-xs"
-                >
-                  {product.condition}
-                </Badge>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Eye className="w-3 h-3" />
-                    <span>{product.views_count || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Heart className="w-3 h-3" />
-                    <span>{product.likes_count || 0}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        ),
+          </div>
+        </Card>
+      ),
     [handleViewProduct, formatPrice]
   );
 

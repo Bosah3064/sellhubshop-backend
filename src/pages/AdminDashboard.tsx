@@ -529,6 +529,19 @@ export default function UltimateAdminDashboard() {
   const [newAdminRole, setNewAdminRole] = useState<"admin" | "moderator">(
     "moderator"
   );
+  const [newAdminPermissions, setNewAdminPermissions] = useState({
+    can_manage_users: true,
+    can_manage_products: true,
+    can_manage_categories: false,
+    can_manage_reports: true,
+    can_manage_subscriptions: false,
+    can_view_analytics: false,
+    can_manage_system: false,
+    can_manage_banners: false,
+    can_export_data: false,
+    can_send_emails: false,
+    can_perform_bulk_actions: false,
+  });
   const [newCategory, setNewCategory] = useState({
     name: "",
     description: "",
@@ -1023,6 +1036,8 @@ export default function UltimateAdminDashboard() {
         variant: "destructive"
       });
       return [];
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, admins: false }));
     }
   };
 
@@ -2043,148 +2058,52 @@ export default function UltimateAdminDashboard() {
 
     setLoading("add-admin", true);
     try {
-      const normalizedEmail = email.trim(); // Allow DB to handle case, but trim spaces
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const response = await fetch(`${backendUrl}/api/admin/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          role,
+          permissions: role === 'super_admin' ? {} : newAdminPermissions
+        })
+      });
+      const result = await response.json();
 
-      // 1. First get the user from profiles table - Case Insensitive
-      const { data: userData, error: userError } = await supabase
-        .from("profiles")
-        .select("id, email")
-        .ilike("email", normalizedEmail)
-        .maybeSingle();
-
-      if (userError) throw userError;
-
-      if (!userData) {
-        throw new Error(`User not found with email: ${normalizedEmail}. The user must be registered on the platform first.`);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to add admin");
       }
-
-      // 2. Check if user is already an admin/moderator
-      const { data: existingAdmin, error: adminCheckError } = await supabase
-        .from("admin_users")
-        .select("id")
-        .eq("user_id", userData.id)
-        .maybeSingle();
-
-      if (adminCheckError) throw adminCheckError;
-
-      if (existingAdmin) {
-        throw new Error("User is already an admin/moderator");
-      }
-
-      // 3. Generate UUID for the admin record
-      const generateUUID = () => {
-        return crypto.randomUUID();
-      };
-
-      // 4. Determine permissions based on role
-      const isAdmin = role === "admin" || role === "super_admin";
-      const isModerator = role === "moderator";
-      const currentTimestamp = new Date().toISOString();
-
-      // 5. Build the admin data exactly matching your table structure
-      const adminData = {
-        // Primary key - UUID
-        id: generateUUID(),
-
-        // User Data
-        email: userData.email, // Use the actual email from profile
-        role: role,
-        user_id: userData.id,
-
-        // Permissions JSON object
-        permissions: {
-          manage_users: isAdmin,
-          manage_admins: role === "super_admin",
-          manage_content: isAdmin || isModerator,
-          manage_reports: isAdmin || isModerator,
-          view_analytics: isAdmin,
-          manage_products: isAdmin || isModerator,
-          manage_settings: isAdmin,
-          manage_categories: isAdmin,
-        },
-
-        // Individual permission fields
-        can_manage_admins: role === "super_admin",
-        can_manage_users: isAdmin,
-        can_manage_products: isAdmin || isModerator,
-        can_manage_categories: isAdmin,
-        can_manage_reports: isAdmin || isModerator,
-        can_manage_settings: isAdmin,
-        can_view_analytics: isAdmin,
-        can_manage_content: isAdmin || isModerator,
-
-        // Status field
-        is_active: true,
-
-        // 2FA Fields (Initialize as disabled)
-        two_factor_enabled: false,
-        two_factor_method: null,
-        two_factor_secret: null,
-        backup_codes: null,
-
-        // Timestamps
-        created_at: currentTimestamp,
-        updated_at: currentTimestamp,
-      };
-
-      console.log("Admin data to insert:", JSON.stringify(adminData, null, 2));
-
-      // 6. Insert into admin_users
-      const { error: insertError } = await supabase
-        .from("admin_users")
-        .insert(adminData);
-
-      if (insertError) {
-        console.error("Database error details:", insertError);
-
-        // Specific error handling
-        if (insertError.code === "23502") {
-          const missingField = insertError.message.match(/column "([^"]+)"/)?.[1];
-          throw new Error(
-            `Missing required field: ${missingField}. Check your admin data structure.`
-          );
-        } else if (insertError.code === "23505") {
-          throw new Error("User is already an admin/moderator");
-        } else if (insertError.code === "23503") {
-          throw new Error("User does not exist in authentication system");
-        }
-
-        throw new Error(`Database error: ${insertError.message}`);
-      }
-
-      // 7. Log the action
-      await logAdminAction("admin_add", "admin", userData.id, { role });
 
       toast({
-        title: "Success! Admin Added",
-        description: `${normalizedEmail} has been added as ${role}`,
+        title: "Admin Added",
+        description: `${email.trim()} has been added as a ${role}.`,
       });
 
-      // 8. Reset and refresh
-      setNewAdminEmail("");
-      setNewAdminRole("moderator");
       setShowAddAdminDialog(false);
-      await loadAdminUsers();
+      setNewAdminEmail("");
+      loadAdminUsers();
+
+      // Log success
+      await logAdminAction(
+        "create",
+        "admin_user",
+        result.data?.id || "unknown",
+        { target_email: email, role }
+      );
+
     } catch (error: any) {
       console.error("Error adding admin:", error);
-
-      if (error.code === "P0001" || error.message?.includes("Two-factor authentication required")) {
-        toast({
-          variant: "destructive",
-          title: "Action Failed: Security Requirement",
-          description: "Database requires YOU to have 2FA enabled before adding other admins. Please go to the Security tab and enable 2FA.",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Add Admin Failed",
-          description: error.message || "Failed to add admin",
-        });
-      }
+      toast({
+        variant: "destructive",
+        title: "Add Admin Failed",
+        description: error.message || "Failed to add admin",
+      });
     } finally {
       setLoading("add-admin", false);
     }
   };
+
+
 
   const handleRemoveAdmin = async (adminId: string) => {
     if (!permissions.canManageAdmins) {
@@ -3747,32 +3666,6 @@ export default function UltimateAdminDashboard() {
           )}
         </CardHeader>
         <CardContent>
-          <Alert className="mb-4 bg-muted/50">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Admin Debug Info</AlertTitle>
-            <AlertDescription className="text-xs font-mono mt-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div>Current User ID: {currentAdmin?.user_id}</div>
-                <div>Current Admin ID: {currentAdmin?.id}</div>
-                <div>Role: {currentAdmin?.role}</div>
-                <div>Admins Found: {adminUsers?.length || 0}</div>
-                <div>Loading: {loadingStates['admins'] ? 'Yes' : 'No'}</div>
-                <div>Permissions: {JSON.stringify(permissions)}</div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => {
-                  console.log("Manual refresh triggered");
-                  loadAdminUsers();
-                }}
-              >
-                <RefreshCw className="h-3 w-3 mr-2" />
-                Force Refresh List
-              </Button>
-            </AlertDescription>
-          </Alert>
           <Table>
             <TableHeader>
               <TableRow>
@@ -3822,9 +3715,9 @@ export default function UltimateAdminDashboard() {
                   <TableCell>
                     {new Date(admin.created_at).toLocaleDateString()}
                   </TableCell>
-                  {permissions.canManageAdmins &&
-                    admin.role !== "super_admin" && (
-                      <TableCell>
+                  {permissions.canManageAdmins && (
+                    <TableCell>
+                      {admin.role !== "super_admin" && (
                         <Button
                           variant="destructive"
                           size="sm"
@@ -3833,8 +3726,9 @@ export default function UltimateAdminDashboard() {
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
-                      </TableCell>
-                    )}
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -5945,6 +5839,31 @@ export default function UltimateAdminDashboard() {
                     You can only create moderator accounts
                   </p>
                 )}
+              </div>
+
+              {/* Permission Checkboxes */}
+              <div className="border rounded-lg p-3 space-y-2">
+                <Label className="text-sm font-medium">Permissions</Label>
+                <p className="text-xs text-muted-foreground mb-2">Select what this admin can do:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(newAdminPermissions).map(([key, value]) => (
+                    <div key={key} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`perm-${key}`}
+                        checked={value}
+                        onChange={(e) => setNewAdminPermissions(prev => ({
+                          ...prev,
+                          [key]: e.target.checked
+                        }))}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <label htmlFor={`perm-${key}`} className="text-xs">
+                        {key.replace(/_/g, ' ').replace(/can /i, '')}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
             <DialogFooter>

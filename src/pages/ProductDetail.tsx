@@ -261,17 +261,28 @@ export default function ProductDetail() {
     try {
       if (!product || !sellerProfile) return;
 
-      const productUrl = window.location.href;
+      // Construct the share URL using the backend endpoint which handles dynamic meta tags
+      // In production, this should point to the backend's public URL
+      const baseUrl = window.location.origin;
+      // If we are in dev (localhost:8080), the backend is likely at /api (proxied) or localhost:3000
+      // For effective social sharing, we need an absolute URL.
+      // Assuming /api is proxied correctly or we use the window.location.origin/api/...
+
+      // Strategy: Use the current origin + /api/share/product/{id}
+      // This works if the frontend domain also hosts the API at /api (common in prod)
+      // or if the proxy handles it. 
+      // Note: For localhost, Facebook/others won't be able to scrape, but the link structure will be correct.
+      const shareUrl = `${baseUrl}/api/share/product/${product.id}`;
+
       const productName = product.name;
       const productPrice = `KES ${product.price.toLocaleString()}`;
-      const productImage = product.images?.[0] || "/placeholder.svg";
       const sellerName = sellerProfile.full_name || sellerProfile.username;
 
       const shareText = `Check out "${productName}" for ${productPrice} by ${sellerName} on MarketHub!`;
 
       switch (platform) {
         case "whatsapp":
-          const whatsappText = `${shareText}\n\n${productUrl}`;
+          const whatsappText = `${shareText}\n\n${shareUrl}`;
           window.open(
             `https://wa.me/?text=${encodeURIComponent(whatsappText)}`,
             "_blank"
@@ -281,14 +292,14 @@ export default function ProductDetail() {
         case "facebook":
           window.open(
             `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-              productUrl
+              shareUrl
             )}`,
             "_blank"
           );
           break;
 
         case "twitter":
-          const twitterText = `${shareText}\n\n${productUrl}`;
+          const twitterText = `${shareText}\n\n${shareUrl}`;
           window.open(
             `https://twitter.com/intent/tweet?text=${encodeURIComponent(
               twitterText
@@ -298,10 +309,10 @@ export default function ProductDetail() {
           break;
 
         case "telegram":
-          const telegramText = `${shareText}\n\n${productUrl}`;
+          const telegramText = `${shareText}\n\n${shareUrl}`;
           window.open(
             `https://t.me/share/url?url=${encodeURIComponent(
-              productUrl
+              shareUrl
             )}&text=${encodeURIComponent(shareText)}`,
             "_blank"
           );
@@ -322,7 +333,7 @@ I found this amazing product on MarketHub that you might be interested in:
 
 ${product.description ? product.description.substring(0, 150) + "..." : ""}
 
-Check it out here: ${productUrl}
+Check it out here: ${shareUrl}
 
 Happy shopping! 🎉
 
@@ -347,7 +358,7 @@ Shared via MarketHub
 
 ${product.description ? product.description.substring(0, 100) + "..." : ""}
 
-🔗 ${productUrl}
+🔗 ${shareUrl}
 
 #MarketHub #${product.category.replace(
             /\s+/g,
@@ -357,7 +368,7 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
 
           await navigator.clipboard.writeText(richText);
           setCopied(true);
-          toast.success("Product details copied to clipboard!");
+          toast.success("Product link copied!");
 
           setTimeout(() => {
             setCopied(false);
@@ -628,8 +639,8 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
                     key={index}
                     onClick={() => setSelectedImage(index)}
                     className={`aspect-square overflow-hidden rounded-lg border-2 ${selectedImage === index
-                        ? "border-green-600"
-                        : "border-transparent"
+                      ? "border-green-600"
+                      : "border-transparent"
                       }`}
                   >
                     <img
@@ -952,8 +963,8 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
                 >
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${copied
-                        ? "bg-green-600"
-                        : "bg-gray-600 group-hover:bg-gray-700"
+                      ? "bg-green-600"
+                      : "bg-gray-600 group-hover:bg-gray-700"
                       }`}
                   >
                     {copied ? (
@@ -1091,8 +1102,8 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
                               <Star
                                 key={index}
                                 className={`w-4 h-4 ${index < review.rating
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-gray-300"
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-gray-300"
                                   }`}
                               />
                             ))}
