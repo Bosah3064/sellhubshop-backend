@@ -1,0 +1,61 @@
+--- ­ƒòÁ´©Å Database Subscription Diagnosis ---
+Found 12 active subscriptions.
+
+Checking Sub ID: 34847718-6d1b-4fee-add9-1d1d6dce1638 | User: be8555b9-4e9a-400b-b92f-c237da5059a3 | Plan: free
+- Profile Plan Type: free
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 055f936e-6a6e-4a7e-9154-dec3b4da7da6 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: silver
+- Profile Plan Type: silver
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 5c5d5207-c69f-4e56-a240-d3fff60a68f6 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: silver
+- Profile Plan Type: undefined
+  ÔÜá´©Å MISMATCH: Profile has 'undefined', expected 'silver'
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 6505c94a-e61b-4d9d-bdb7-c39c808037e5 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: free
+- Profile Plan Type: silver
+  ÔÜá´©Å MISMATCH: Profile has 'silver', expected 'free'
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: b0a189bc-4cc0-460c-8a4c-90c6ace1e04f | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: test
+- Profile Plan Type: silver
+  ÔÜá´©Å MISMATCH: Profile has 'silver', expected 'test'
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 02c47cf2-51de-4f43-8601-e4d18bbd9080 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: test
+- Profile Plan Type: silver
+  ÔÜá´©Å MISMATCH: Profile has 'silver', expected 'test'
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 180854f9-475a-4b4c-b183-447fb3c95148 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: test
+- Profile Plan Type: silver
+  ÔÜá´©Å MISMATCH: Profile has 'silver', expected 'test'
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 0c1e2e2b-126f-4778-a989-e63077a796b9 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: test
+- Profile Plan Type: silver
+  ÔÜá´©Å MISMATCH: Profile has 'silver', expected 'test'
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 694df3b3-99b8-47d6-9e92-a201267fbe25 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: silver
+- Profile Plan Type: silver
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: f2f3ab0d-7af7-46dc-bd01-ed6282a75c23 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: silver
+- Profile Plan Type: silver
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: 7e060e70-7524-4c9b-9c73-adf76968f2b2 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: silver
+- Profile Plan Type: silver
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+Checking Sub ID: af355d7d-0338-4362-9b89-d4b135b897c2 | User: c12a1d8d-b380-4e44-b39b-51ad55c71fa1 | Plan: silver
+- Profile Plan Type: silver
+  ÔÜá´©Å MISSING: No active record in 'user_plans' for this user.
+
+--- ­ƒôï Master Plans List ---
+- ceb71ae1-caaa-44df-8b1a-62daa6a2938e: Free (Limit: 5)
+- 0b922be5-91b7-46c7-8ac9-2c0a95e32593: Silver (Limit: 50)
+- f34c0928-7494-46a6-9ff9-c4d498818297: Gold (Limit: 1000)

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "bbec3c22-b1e1-4a0f-a4cd-eac0f636c09c",
+    "user_id": "c12a1d8d-b380-4e44-b39b-51ad55c71fa1",
+    "plan_id": "0b922be5-91b7-46c7-8ac9-2c0a95e32593",
+    "starts_at": "2025-11-16T10:32:32.089+00:00",
+    "expires_at": "2025-12-16T10:32:32.089+00:00",
+    "status": "active",
+    "created_at": "2025-11-18T21:25:37.797256+00:00",
+    "billing_cycle": "monthly"
+  }
+]
