@@ -270,7 +270,8 @@ export default function Checkout() {
                     amount: Math.ceil(getTotal() + deliveryFee), // Ensure integer
                     phone: phoneToBill,
                     accountRef: order.id, // CRITICAL: Pass Order ID as Reference
-                    description: `Order #${order.id.substring(0, 8)}`
+                    description: `Order #${order.id.substring(0, 8)}`,
+                    orderId: order.id // Pass ID for backend to link
                 })
             });
 

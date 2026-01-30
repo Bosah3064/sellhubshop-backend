@@ -135,7 +135,8 @@ const Wallet = () => {
                 amount: Math.ceil(amount),
                 phone: phoneToBill,
                 accountRef: shortRef, // Use Short Ref (12 chars) instead of UUID
-                description: `Wallet Deposit`
+                description: `Wallet Deposit`,
+                walletTransactionId: transaction.id // Pass ID for backend to link
             })
         });
 
@@ -143,10 +144,17 @@ const Wallet = () => {
         
         if (result.ResponseCode === "0") {
             // Store the CheckoutRequestID so callback can find this transaction
-            await supabase
+            console.log('[Wallet] Storing CheckoutRequestID:', result.CheckoutRequestID);
+            const { error: updateError } = await supabase
                 .from('wallet_transactions')
                 .update({ mpesa_receipt: result.CheckoutRequestID })
                 .eq('id', transaction.id);
+            
+            if (updateError) {
+                console.error('[Wallet] Failed to store CheckoutRequestID:', updateError);
+            } else {
+                console.log('[Wallet] CheckoutRequestID stored successfully');
+            }
                 
             toast.success("STK Push initiated! Check your phone.");
             setShowDepositModal(false);
