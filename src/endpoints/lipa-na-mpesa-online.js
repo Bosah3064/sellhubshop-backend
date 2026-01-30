@@ -299,9 +299,46 @@ router.post('/callback', async (req, res) => {
                     console.log('[M-Pesa] Order Payment Processed Successfully.');
 
                 } else {
-                    console.warn(`[M-Pesa] No Subscription OR Order found for CheckoutRequestID: ${CheckoutRequestID}`);
+                    // --- WALLET DEPOSIT LOGIC ---
+                    console.log('[M-Pesa] Not an order. Checking Wallet Deposits...');
+                    
+                    // Extract AccountReference from callback metadata
+                    let accountRef = null;
+                    if (CallbackMetadata && CallbackMetadata.Item) {
+                        // AccountReference is not in metadata, we need to get it from the original request
+                        // But we can search by CheckoutRequestID in our pending transactions
+                    }
+                    
+                    // Check for wallet deposit transaction by CheckoutRequestID stored in mpesa_receipt
+                    // OR by reference_id if we stored the shortRef there
+                    const { data: depositTx, error: depositError } = await supabase
+                        .from('wallet_transactions')
+                        .select('id, wallet_id, amount, reference_id')
+                        .eq('status', 'pending')
+                        .eq('reference_type', 'deposit')
+                        .or(`mpesa_receipt.eq.${CheckoutRequestID}`)
+                        .maybeSingle();
+
+                    if (depositTx) {
+                        console.log(`[M-Pesa] Found Wallet Deposit Transaction #${depositTx.id}. Processing...`);
+                        
+                        // Call the process_wallet_deposit function
+                        const { data: processResult, error: processError } = await supabase.rpc('process_wallet_deposit', {
+                            p_transaction_id: depositTx.id,
+                            p_mpesa_receipt: receipt
+                        });
+
+                        if (processError) {
+                            console.error('[M-Pesa] Error processing wallet deposit:', processError);
+                        } else {
+                            console.log('[M-Pesa] Wallet Deposit Processed Successfully!');
+                        }
+                    } else {
+                        console.warn(`[M-Pesa] No Subscription, Order, OR Wallet Deposit found for CheckoutRequestID: ${CheckoutRequestID}`);
+                    }
                 }
             }
+
 
         } else {
             console.log('[M-Pesa] Payment Failed/Cancelled.');
