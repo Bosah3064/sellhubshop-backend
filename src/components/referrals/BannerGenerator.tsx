@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Download, Sparkles, Check, Star, ShoppingBag, Zap, Gift,
-    Crown, TrendingUp, Users, Heart, Package, ArrowRight, Shield, Image as ImageIcon, FileImage
+    Crown, TrendingUp, Users, Heart, Package, ArrowRight, Shield, Image as ImageIcon, FileImage,
+    CreditCard, LayoutDashboard, Globe
 } from 'lucide-react';
 import { toPng, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
@@ -18,24 +19,66 @@ interface BannerGeneratorProps {
     userName?: string;
 }
 
+type CampaignType = 'marketplace' | 'pricing' | 'referral' | 'dashboard';
+
 export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps) => {
     const bannerRef = useRef<HTMLDivElement>(null);
     const [downloading, setDownloading] = useState(false);
     const [activeTemplate, setActiveTemplate] = useState('marketplace');
+    const [campaignType, setCampaignType] = useState<CampaignType>('marketplace');
     const [downloadFormat, setDownloadFormat] = useState('png');
     const [imageQuality, setImageQuality] = useState('high');
 
     const [config, setConfig] = useState({
-        headline: 'Shop Smarter, Earn Rewards!',
-        subheadline: 'Join Kenya\'s fastest growing marketplace. Use my code and we both win!',
-        ctaText: 'Join Now & Save',
+        headline: '',
+        subheadline: '',
+        ctaText: '',
         accentColor: '#10b981',
-        showProducts: true,
+        showShowcase: true,
         showStats: true,
         showBadge: true,
         showLogo: true,
         opacity: 0.95,
     });
+
+    // Preset configurations for different campaign types
+    const campaignDefaults = {
+        marketplace: {
+            headline: 'Shop Smarter, Earn Rewards!',
+            subheadline: 'Join Kenya\'s fastest growing marketplace. Use my code and we both win!',
+            ctaText: 'Start Shopping',
+            icon: ShoppingBag
+        },
+        pricing: {
+            headline: 'Unlock Premium Features',
+            subheadline: 'Get 3x more visibility and zero transaction fees with Silver & Gold tiers.',
+            ctaText: 'View Plans',
+            icon: CreditCard
+        },
+        referral: {
+            headline: 'Earn Cash for Every Invite',
+            subheadline: 'Invite friends to SellHubShop and earn up to KES 150 per referral!',
+            ctaText: 'Join My Team',
+            icon: Gift
+        },
+        dashboard: {
+            headline: 'Track Your Success Real-time',
+            subheadline: 'Manage your sales, inventory, and earnings all in one powerful dashboard.',
+            ctaText: 'Go to Dashboard',
+            icon: LayoutDashboard
+        }
+    };
+
+    // Update config when campaign type changes
+    useEffect(() => {
+        const defaults = campaignDefaults[campaignType];
+        setConfig(prev => ({
+            ...prev,
+            headline: defaults.headline,
+            subheadline: defaults.subheadline,
+            ctaText: defaults.ctaText
+        }));
+    }, [campaignType]);
 
     // Professional banner templates
     const templates = [
@@ -81,12 +124,26 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
         },
     ];
 
-    // Simulated marketplace products for visual appeal
-    const showcaseProducts = [
-        { name: 'Electronics', price: 'KES 25,000', emoji: '📱', discount: '-15%' },
-        { name: 'Fashion', price: 'KES 3,500', emoji: '👗', discount: '-20%' },
-        { name: 'Home & Living', price: 'KES 12,000', emoji: '🏠', discount: '-10%' },
-    ];
+    // Data for different showcase contexts
+    const showcaseData = {
+        marketplace: [
+            { title: 'Electronics', price: 'KES 25,000', emoji: '📱', badge: '-15%' },
+            { title: 'Fashion', price: 'KES 3,500', emoji: '👗', badge: '-20%' },
+            { title: 'Home & Living', price: 'KES 12,000', emoji: '🏠', badge: '-10%' },
+        ],
+        pricing: [
+            { title: 'Silver Plan', price: 'KES 200/mo', emoji: '🥈', badge: 'POPULAR' },
+            { title: 'Gold Plan', price: 'KES 500/mo', emoji: '👑', badge: 'BEST VALUE' },
+        ],
+        referral: [
+            { title: 'Invites', price: '+5 Friends', emoji: '🚀', badge: 'TODAY' },
+            { title: 'Earnings', price: 'KES 2,500', emoji: '💰', badge: 'THIS WEEK' },
+        ],
+        dashboard: [
+            { title: 'Total Sales', price: 'KES 50K+', emoji: '📈', badge: '+12%' },
+            { title: 'Active Listings', price: '45 Items', emoji: '📦', badge: 'LIVE' },
+        ]
+    };
 
     const stats = [
         { label: 'Active Sellers', value: '5,000+', icon: Users },
@@ -99,13 +156,13 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
 
         try {
             setDownloading(true);
-
+            
             const pixelRatio = imageQuality === 'high' ? 3 : imageQuality === 'medium' ? 2 : 1;
             const quality = imageQuality === 'high' ? 1 : imageQuality === 'medium' ? 0.9 : 0.8;
-
+            
             let dataUrl: string;
             let fileExtension: string;
-
+            
             if (downloadFormat === 'png') {
                 dataUrl = await toPng(bannerRef.current, {
                     quality: 1,
@@ -124,7 +181,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
             }
 
             const link = document.createElement('a');
-            link.download = `sellhubshop-referral-${referralCode}.${fileExtension}`;
+            link.download = `sellhubshop-${campaignType}-${referralCode}.${fileExtension}`;
             link.href = dataUrl;
             link.click();
 
@@ -138,6 +195,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
     };
 
     const currentTemplate = templates.find(t => t.id === activeTemplate) || templates[0];
+    const currentShowcaseItems = showcaseData[campaignType];
 
     return (
         <Card className="p-4 sm:p-6 bg-gradient-to-br from-white to-gray-50 border-2 border-gray-100 shadow-lg rounded-2xl sm:rounded-3xl">
@@ -152,7 +210,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             Pro Banner Studio
                         </h3>
                         <p className="text-xs sm:text-sm text-gray-500">
-                            Create professional social media graphics
+                            Create professional social media graphics for any page
                         </p>
                     </div>
                 </div>
@@ -161,10 +219,48 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-8">
                 {/* Controls Panel */}
                 <div className="xl:col-span-4 space-y-4 sm:space-y-6">
+                    {/* Campaign Type Selector */}
+                    <div>
+                        <Label className="text-sm font-semibold text-gray-700 mb-3 block">
+                            Campaign Type
+                        </Label>
+                        <Select value={campaignType} onValueChange={(val: CampaignType) => setCampaignType(val)}>
+                            <SelectTrigger className="w-full h-11 bg-white border-2 border-slate-200">
+                                <SelectValue placeholder="Select campaign type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="marketplace">
+                                    <div className="flex items-center gap-2">
+                                        <ShoppingBag className="w-4 h-4" />
+                                        <span>Marketplace Promotion</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="pricing">
+                                    <div className="flex items-center gap-2">
+                                        <CreditCard className="w-4 h-4" />
+                                        <span>Pricing & Plans</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="referral">
+                                    <div className="flex items-center gap-2">
+                                        <Gift className="w-4 h-4" />
+                                        <span>Referral Program</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="dashboard">
+                                    <div className="flex items-center gap-2">
+                                        <LayoutDashboard className="w-4 h-4" />
+                                        <span>Dashboard & Stats</span>
+                                    </div>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     {/* Template Selector */}
                     <div>
                         <Label className="text-sm font-semibold text-gray-700 mb-3 block">
-                            Choose Template
+                            Visual Style
                         </Label>
                         <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 sm:gap-3">
                             {templates.map((t) => {
@@ -173,13 +269,14 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                     <button
                                         key={t.id}
                                         onClick={() => setActiveTemplate(t.id)}
-                                        className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 text-left ${activeTemplate === t.id
-                                                ? 'border-purple-500 bg-purple-50 shadow-lg scale-[1.02]'
+                                        className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 text-left ${
+                                            activeTemplate === t.id 
+                                                ? 'border-purple-500 bg-purple-50 shadow-lg scale-[1.02]' 
                                                 : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                                            }`}
+                                        }`}
                                     >
                                         <div className="flex items-center gap-2 sm:gap-3">
-                                            <div
+                                            <div 
                                                 className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-md"
                                                 style={{ background: t.bg }}
                                             >
@@ -213,7 +310,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                 <Input
                                     value={config.headline}
                                     onChange={(e) => setConfig({ ...config, headline: e.target.value })}
-                                    className="mt-1 text-sm"
+                                    className="mt-1 text-sm bg-white"
                                     maxLength={40}
                                     placeholder="Your catchy headline..."
                                 />
@@ -223,7 +320,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                 <Input
                                     value={config.subheadline}
                                     onChange={(e) => setConfig({ ...config, subheadline: e.target.value })}
-                                    className="mt-1 text-sm"
+                                    className="mt-1 text-sm bg-white"
                                     maxLength={80}
                                     placeholder="Describe the benefits..."
                                 />
@@ -233,7 +330,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                 <Input
                                     value={config.ctaText}
                                     onChange={(e) => setConfig({ ...config, ctaText: e.target.value })}
-                                    className="mt-1 text-sm"
+                                    className="mt-1 text-sm bg-white"
                                     maxLength={20}
                                     placeholder="Call to action..."
                                 />
@@ -254,20 +351,20 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                         className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                     />
                                 </label>
-
+                                
                                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
                                     <div className="flex items-center gap-2">
                                         <Package className="w-4 h-4 text-gray-600" />
-                                        <span className="text-sm font-medium text-gray-700">Show Products</span>
+                                        <span className="text-sm font-medium text-gray-700">Show Details Cards</span>
                                     </div>
                                     <input
                                         type="checkbox"
-                                        checked={config.showProducts}
-                                        onChange={(e) => setConfig({ ...config, showProducts: e.target.checked })}
+                                        checked={config.showShowcase}
+                                        onChange={(e) => setConfig({ ...config, showShowcase: e.target.checked })}
                                         className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                     />
                                 </label>
-
+                                
                                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
                                     <div className="flex items-center gap-2">
                                         <TrendingUp className="w-4 h-4 text-gray-600" />
@@ -301,7 +398,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             <div>
                                 <Label className="text-xs sm:text-sm font-medium mb-2 block">Download Format</Label>
                                 <Select value={downloadFormat} onValueChange={setDownloadFormat}>
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-full bg-white">
                                         <SelectValue placeholder="Select format" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -325,7 +422,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             <div>
                                 <Label className="text-xs sm:text-sm font-medium mb-2 block">Image Quality</Label>
                                 <Select value={imageQuality} onValueChange={setImageQuality}>
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-full bg-white">
                                         <SelectValue placeholder="Select quality" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -345,8 +442,8 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
                                 <p className="text-sm font-medium text-blue-900 mb-1">📁 Export Info</p>
                                 <p className="text-xs text-blue-700">
-                                    <strong>PNG</strong>: Best for web & transparency. Larger file size.<br />
-                                    <strong>JPG</strong>: Great for sharing. Smaller file size.
+                                    <strong>PNG</strong>: Best for web & transparency.<br/>
+                                    <strong>JPG</strong>: Great for sharing via WhatsApp.
                                 </p>
                             </div>
                         </TabsContent>
@@ -360,7 +457,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                         className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold h-12 sm:h-14 rounded-xl sm:rounded-2xl shadow-lg transition-all hover:scale-[1.02] hover:shadow-xl text-sm sm:text-base"
                     >
                         <Download className="w-5 h-5 mr-2" />
-                        {downloading ? 'Creating Image...' : `Download as ${downloadFormat.toUpperCase()}`}
+                        {downloading ? 'Creating Image...' : `Download ${campaignType.charAt(0).toUpperCase() + campaignType.slice(1)} Banner`}
                     </Button>
                 </div>
 
@@ -376,9 +473,9 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             {/* Gradient Orbs */}
                             <div className="absolute -top-20 -right-20 w-40 sm:w-80 h-40 sm:h-80 bg-white/10 rounded-full blur-3xl" />
                             <div className="absolute -bottom-20 -left-20 w-40 sm:w-60 h-40 sm:h-60 bg-black/10 rounded-full blur-3xl" />
-
+                            
                             {/* Pattern Grid */}
-                            <div
+                            <div 
                                 className="absolute inset-0 opacity-10"
                                 style={{
                                     backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -387,19 +484,18 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                         </div>
 
                         {/* Main Content Container */}
-                        <div className="absolute inset-0 flex flex-col p-4 sm:p-8 z-10">
+                        <div className="absolute inset-0 flex flex-col p-4 sm:p-8 z-10 transition-all duration-300">
                             {/* Top Bar */}
                             <div className="flex justify-between items-start mb-auto">
                                 {/* Brand Badge with Logo */}
                                 <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-white/30">
                                     {config.showLogo && (
                                         <div className="w-6 h-6 sm:w-8 sm:h-8 bg-white rounded-full flex items-center justify-center shadow-md overflow-hidden">
-                                            <img
-                                                src="/logo.png"
-                                                alt="SellHubShop"
+                                            <img 
+                                                src="/logo.png" 
+                                                alt="SellHubShop" 
                                                 className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
                                                 onError={(e) => {
-                                                    // Fallback if logo doesn't load
                                                     const target = e.target as HTMLImageElement;
                                                     target.style.display = 'none';
                                                 }}
@@ -412,7 +508,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
 
                                 {/* Referral Code */}
                                 <div className="text-right">
-                                    <p className="text-[8px] sm:text-xs text-white/70 uppercase tracking-widest mb-0.5">Use Code</p>
+                                    <p className="text-[8px] sm:text-xs text-white/70 uppercase tracking-widest mb-0.5">My Invite Code</p>
                                     <div className="bg-white/20 backdrop-blur-md px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg border border-white/30">
                                         <p className="text-base sm:text-2xl font-mono font-black text-white tracking-wider">{referralCode}</p>
                                     </div>
@@ -427,14 +523,14 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                         {config.showBadge && (
                                             <div className="inline-flex items-center gap-1 sm:gap-2 bg-yellow-400 text-yellow-900 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
                                                 <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
-                                                EXCLUSIVE INVITE
+                                                {campaignType === 'pricing' ? 'LIMITED OFFER' : 'EXCLUSIVE INVITE'}
                                             </div>
                                         )}
-
+                                        
                                         <h1 className="text-xl sm:text-4xl lg:text-5xl font-black text-white leading-tight drop-shadow-lg">
                                             {config.headline}
                                         </h1>
-
+                                        
                                         <p className="text-white/90 text-xs sm:text-lg font-medium leading-relaxed max-w-md">
                                             {config.subheadline}
                                         </p>
@@ -448,22 +544,24 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                                         </div>
                                     </div>
 
-                                    {/* Product Showcase Cards */}
-                                    {config.showProducts && (
+                                    {/* Showcase Cards - Context Dependent */}
+                                    {config.showShowcase && (
                                         <div className="hidden lg:flex flex-col gap-2">
-                                            {showcaseProducts.map((product, idx) => (
-                                                <div
+                                            {currentShowcaseItems.map((item, idx) => (
+                                                <div 
                                                     key={idx}
                                                     className="flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-3 rounded-xl shadow-lg border border-white/50"
                                                     style={{ transform: `translateX(${idx * 10}px)` }}
                                                 >
-                                                    <div className="text-2xl">{product.emoji}</div>
-                                                    <div>
-                                                        <p className="text-xs font-bold text-gray-900">{product.name}</p>
-                                                        <p className="text-xs text-gray-600">{product.price}</p>
+                                                    <div className="text-2xl w-8 h-8 flex items-center justify-center bg-gray-50 rounded-lg">{item.emoji}</div>
+                                                    <div className="min-w-[100px]">
+                                                        <p className="text-xs font-bold text-gray-900">{item.title}</p>
+                                                        <p className="text-xs text-gray-600">{item.price}</p>
                                                     </div>
-                                                    <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                        {product.discount}
+                                                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                        idx === 0 ? 'bg-red-500 text-white' : 'bg-green-100 text-green-700'
+                                                    }`}>
+                                                        {item.badge}
                                                     </div>
                                                 </div>
                                             ))}
@@ -511,7 +609,7 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
             <div className="mt-6 sm:mt-8 p-4 sm:p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl sm:rounded-2xl border border-gray-200">
                 <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
                     <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-                    Quick Tips for Maximum Impact
+                    Quick Tips for {campaignType.charAt(0).toUpperCase() + campaignType.slice(1)} Campaigns
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     <div className="flex items-start gap-2 sm:gap-3">
@@ -519,8 +617,8 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
                         </div>
                         <div>
-                            <p className="font-semibold text-gray-900 text-xs sm:text-sm">WhatsApp Status</p>
-                            <p className="text-[10px] sm:text-xs text-gray-500">Post as status for 24hr visibility</p>
+                            <p className="font-semibold text-gray-900 text-xs sm:text-sm">Social Stories</p>
+                            <p className="text-[10px] sm:text-xs text-gray-500">Post this banner on WhatsApp/IG daily.</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-2 sm:gap-3">
@@ -528,8 +626,8 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             <Check className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
                         </div>
                         <div>
-                            <p className="font-semibold text-gray-900 text-xs sm:text-sm">Facebook Groups</p>
-                            <p className="text-[10px] sm:text-xs text-gray-500">Share in local buy/sell groups</p>
+                            <p className="font-semibold text-gray-900 text-xs sm:text-sm">Community Groups</p>
+                            <p className="text-[10px] sm:text-xs text-gray-500">Share with a personal review caption.</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-2 sm:gap-3">
@@ -537,8 +635,8 @@ export const BannerGenerator = ({ referralCode, userName }: BannerGeneratorProps
                             <Check className="w-3 h-3 sm:w-4 sm:h-4 text-purple-600" />
                         </div>
                         <div>
-                            <p className="font-semibold text-gray-900 text-xs sm:text-sm">Instagram Stories</p>
-                            <p className="text-[10px] sm:text-xs text-gray-500">Use swipe-up or link sticker</p>
+                            <p className="font-semibold text-gray-900 text-xs sm:text-sm">Consistent Branding</p>
+                            <p className="text-[10px] sm:text-xs text-gray-500">Use the same template for trust.</p>
                         </div>
                     </div>
                 </div>

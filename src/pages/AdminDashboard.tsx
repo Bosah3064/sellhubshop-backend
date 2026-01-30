@@ -123,8 +123,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { convertKESToPi, formatPi } from "@/lib/pi-utils";
-import { PiIcon } from "@/components/PiLogo";
+
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -4299,10 +4298,7 @@ export default function UltimateAdminDashboard() {
                         <TableCell className="font-semibold">
                           <div className="flex flex-col">
                             <span>KES {product.price?.toLocaleString()}</span>
-                            <span className="text-xs text-purple-600 flex items-center gap-1">
-                              <PiIcon className="w-3 h-3" />
-                              {formatPi(convertKESToPi(product.price || 0))}
-                            </span>
+
                           </div>
                         </TableCell>
                         <TableCell>{product.seller_email}</TableCell>
@@ -4407,10 +4403,7 @@ export default function UltimateAdminDashboard() {
                         <TableCell className="font-semibold">
                           <div className="flex flex-col">
                             <span>KES {product.price?.toLocaleString()}</span>
-                            <span className="text-xs text-purple-600 flex items-center gap-1">
-                              <PiIcon className="w-3 h-3" />
-                              {formatPi(convertKESToPi(product.price || 0))}
-                            </span>
+
                           </div>
                         </TableCell>
                         <TableCell>{product.seller_email}</TableCell>
@@ -4664,10 +4657,7 @@ export default function UltimateAdminDashboard() {
                                     <Badge variant="outline" className="text-xs">
                                       KES {report.product_price.toLocaleString()}
                                     </Badge>
-                                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
-                                      <PiIcon className="w-2.5 h-2.5 mr-0.5" />
-                                      {formatPi(convertKESToPi(report.product_price))}
-                                    </Badge>
+
                                   </div>
                                 )}
                                 {report.product_category_name && (
@@ -4944,10 +4934,7 @@ export default function UltimateAdminDashboard() {
                               <TableCell>
                                 <div className="flex flex-col">
                                   <span>KES {subscription.price_monthly?.toLocaleString()}</span>
-                                  <span className="text-xs text-purple-600 flex items-center gap-1">
-                                    <PiIcon className="w-3 h-3" />
-                                    {formatPi(convertKESToPi(subscription.price_monthly || 0))}
-                                  </span>
+
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -5166,10 +5153,7 @@ export default function UltimateAdminDashboard() {
                           <TableCell className="font-bold">
                             <div className="flex flex-col">
                               <span>KES {w.amount.toLocaleString()}</span>
-                              <span className="text-xs text-purple-600 flex items-center gap-1">
-                                <PiIcon className="w-3 h-3" />
-                                {formatPi(convertKESToPi(w.amount))}
-                              </span>
+
                             </div>
                           </TableCell>
                           <TableCell className="capitalize">
@@ -5344,10 +5328,7 @@ export default function UltimateAdminDashboard() {
                           </span>
                           <span className="text-sm font-bold flex flex-col items-end">
                             <span>KES {stats.totalRevenue.toLocaleString()}</span>
-                            <span className="text-xs text-purple-600 flex items-center gap-1">
-                              <PiIcon className="w-3 h-3" />
-                              {formatPi(convertKESToPi(stats.totalRevenue))}
-                            </span>
+
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -5400,10 +5381,7 @@ export default function UltimateAdminDashboard() {
                             <p className="font-semibold">
                               KES {stats.totalRevenue.toLocaleString()}
                             </p>
-                            <p className="text-xs text-purple-600 flex items-center justify-center gap-1">
-                              <PiIcon className="w-3 h-3" />
-                              {formatPi(convertKESToPi(stats.totalRevenue))}
-                            </p>
+
                             <p className="text-muted-foreground">
                               Total Revenue
                             </p>

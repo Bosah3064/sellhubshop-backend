@@ -16,10 +16,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-// Pi Network utilities
-import { convertKESToPi, formatPi } from "@/lib/pi-utils";
-import { PiLogo, PiIcon } from "@/components/PiLogo";
-
 // UI Components
 import {
   Card,
@@ -184,23 +180,19 @@ export default function Pricing() {
 
   useEffect(() => {
     console.log("Pricing Component Mounted");
-    document.title = "Pricing Plans - Pi Network & KES | Marketplace Subscription Plans";
+    document.title = "Pricing Plans | SellHub Marketplace";
 
-    // Add Pi Network meta tags for SEO
+    // Set page metadata
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute('content', 'Choose your perfect marketplace plan. Pay with KES now, Pi Network coming soon! Flexible pricing for sellers at all levels.');
+      metaDescription.setAttribute('content', 'Choose your perfect marketplace plan. Flexible pricing for sellers at all levels.');
     }
 
     const metaKeywords = document.querySelector('meta[name="keywords"]');
-    if (metaKeywords) {
-      metaKeywords.setAttribute('content', 'Pi Network, cryptocurrency, marketplace pricing, KES payment, subscription plans, seller plans, Pi payments');
-    } else {
       const keywords = document.createElement('meta');
       keywords.name = 'keywords';
-      keywords.content = 'Pi Network, cryptocurrency, marketplace pricing, KES payment, subscription plans, seller plans, Pi payments';
+      keywords.content = 'marketplace pricing, KES payment, subscription plans, seller plans';
       document.head.appendChild(keywords);
-    }
   }, []);
 
   if (isLoading) {
@@ -226,10 +218,9 @@ export default function Pricing() {
         <header className="mb-20 text-center max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-3 mb-8">
             <div className="bg-white/5 backdrop-blur-md rounded-full px-4 py-1.5 border border-white/10 flex items-center gap-2 shadow-2xl">
-              <PiLogo size="sm" showText={false} />
               <span className="text-sm font-medium text-emerald-400 flex items-center gap-1">
                 <Sparkles className="w-3 h-3 fill-current" />
-                Pi Payments Coming Soon
+                Featured Seller Plans
               </span>
             </div>
           </div>
@@ -451,10 +442,6 @@ function PlanCard({
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-emerald-400 font-medium flex items-center gap-1">
-                    <PiIcon className="w-3.5 h-3.5 fill-current" />
-                    {formatPi(convertKESToPi(price))}
-                  </span>
                   {billingCycle === "yearly" && (
                     <span className="text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
                       Save {formatCurrency(plan.priceMonthly * 12 - price)}
@@ -532,6 +519,7 @@ function PaymentDialog({
 }: PaymentDialogProps) {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mpesa');
   const price =
     billingCycle === "monthly" ? plan.priceMonthly : plan.priceYearly;
 
@@ -828,7 +816,7 @@ function PaymentDialog({
           </Button>
         </DialogClose>
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center gap-2 bg-green-500/20 text-green-400 text-xs font-semibold px-3 py-1 rounded-full border border-green-500/30">
+          <div className="inline-flex items-center justify-center gap-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs font-semibold px-3 py-1 rounded-full border">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             M-PESA PAYMENT
           </div>
@@ -837,14 +825,6 @@ function PaymentDialog({
             <span className="text-4xl font-bold text-white">{formatCurrency(price)}</span>
             <span className="text-slate-400 text-sm">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
           </div>
-          <div className="flex items-center justify-center gap-2 text-emerald-400 text-sm">
-            <PiIcon className="w-4 h-4 fill-current" />
-            <span>{formatPi(convertKESToPi(price))}</span>
-            <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-[10px]">
-              <Sparkles className="w-2.5 h-2.5 mr-1" />
-              Soon
-            </Badge>
-          </div>
         </div>
       </div>
 
@@ -852,6 +832,8 @@ function PaymentDialog({
       <div className="max-h-[50vh] overflow-y-auto p-6 space-y-5">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(processPayment)} className="space-y-5">
+
+
             <FormField
               control={form.control}
               name="fullName"
@@ -874,40 +856,34 @@ function PaymentDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="phoneNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300 text-sm font-medium">M-Pesa Phone Number</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Smartphone className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                      <Input
-                        {...field}
-                        placeholder="0712345678"
-                        maxLength={10}
-                        disabled={isProcessing}
-                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
-                        className="pl-10 h-12 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-xl"
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
+            {/* M-Pesa Phone Number - Only show when M-Pesa selected */}
+            {paymentMethod === 'mpesa' && (
+              <FormField
+                control={form.control}
+                name="phoneNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-slate-300 text-sm font-medium">M-Pesa Phone Number</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Smartphone className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                        <Input
+                          {...field}
+                          placeholder="0712345678"
+                          maxLength={10}
+                          disabled={isProcessing}
+                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                          className="pl-10 h-12 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-xl"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Pi Network Notice */}
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/20 rounded-xl">
-              <div className="bg-purple-500/20 p-2.5 rounded-full">
-                <PiIcon className="w-5 h-5 fill-purple-400" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-purple-200">Pi Network Payments</h4>
-                <p className="text-xs text-purple-300/70">Coming soon! Pay with Pi cryptocurrency.</p>
-              </div>
-            </div>
+
 
             {/* Security Badge */}
             <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
@@ -937,9 +913,13 @@ function PaymentDialog({
             type="submit"
             disabled={isProcessing}
             onClick={form.handleSubmit(processPayment)}
-            className="flex-1 h-12 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-900/30"
+            className="flex-1 h-12 rounded-xl font-bold text-white shadow-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-green-900/30"
           >
-            {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : `Pay ${formatCurrency(price)}`}
+            {isProcessing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              `Pay ${formatCurrency(price)}`
+            )}
           </Button>
         </div>
       </div>

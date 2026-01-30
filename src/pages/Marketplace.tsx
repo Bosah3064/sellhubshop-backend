@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Play,
   Pause,
   ThumbsUp,
@@ -65,6 +67,7 @@ import {
   BarChart,
   Settings,
   RefreshCw,
+  RotateCcw,
   ExternalLink,
   Battery,
   BatteryCharging,
@@ -75,12 +78,15 @@ import {
   SignalMedium,
   SignalHigh,
   Smartphone,
+  ShoppingCart,
   Trash2,
+  TrendingDown,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { trackProductView } from "@/utils/trackProductView";
-import { Link } from "react-router-dom";
+import kenyanLocations from "@/data/kenyan-locations.json";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
@@ -90,7 +96,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CompactPriceDisplay } from "@/components/PriceDisplay";
-import { PiLogo } from "@/components/PiLogo";
+import { ContactSellerDialog } from "@/components/dialogs/ContactSellerDialog";
 
 const categories = [
   "All",
@@ -169,6 +175,7 @@ interface Product {
   subcategory: string | null;
   brand: string | null;
   condition: string;
+  county: string;
   location: string;
   latitude: number | null;
   longitude: number | null;
@@ -220,20 +227,34 @@ interface ContactSession {
   created_at: string;
 }
 
+import { FilterSidebar } from "@/components/marketplace/FilterSidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useCart } from "@/hooks/useCart";
+
 export default function Marketplace() {
+  console.log("🔍 Marketplace component rendering...");
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const { addToCart } = useCart();
+
+  // New Filter State
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000000]);
+  const [countyFilter, setCountyFilter] = useState("");
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
+  const [conditionFilter, setConditionFilter] = useState<string[]>([]);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState("newest");
+
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [contactModalOpen, setContactModalOpen] = useState(false);
-  const [productDetailModalOpen, setProductDetailModalOpen] = useState(false);
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userFavorites, setUserFavorites] = useState<Favorite[]>([]);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isSlideshowPlaying, setIsSlideshowPlaying] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [newReview, setNewReview] = useState({ rating: 5, comment: "" });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -249,6 +270,7 @@ export default function Marketplace() {
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [counties, setCounties] = useState<{ id: string, name: string }[]>([]);
 
   // Simple contact tracking
   const [contactHistory, setContactHistory] = useState<ContactSession[]>([]);
@@ -261,20 +283,55 @@ export default function Marketplace() {
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
 
+  // Product Detail Modal State
+  const [productDetailModalOpen, setProductDetailModalOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isSlideshowPlaying, setIsSlideshowPlaying] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+
+  // Smart Search State
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
+  const modalContentRef = useRef<HTMLDivElement>(null);
+  const trendingSearches = ["iPhone 15", "Toyota Hilux", "Gaming Laptop", "Sneakers", "Apartments"];
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const slideshowRef = useRef<NodeJS.Timeout | null>(null);
+
   const securityCheckInterval = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with URL params
+  useEffect(() => {
+    const category = searchParams.get("category");
+    const search = searchParams.get("search"); // Footer uses ?search=...
+    const q = searchParams.get("q"); // Common alternative
+
+    if (category) {
+      setSelectedCategory(category);
+    }
+
+    if (search || q) {
+      setSearchQuery(search || q || "");
+    }
+  }, [searchParams]);
 
   // Initialize
   useEffect(() => {
-    document.title = "Marketplace - Browse Products | Pi Network Accepted Soon";
+    document.title = "Marketplace - Browse Products | SellHub";
     initializeBasicSecurity();
     loadCurrentUserProfile();
-    loadProducts();
+    fetchCounties();
+    // loadProducts(); -> Moved to filter effect
     loadUserFavorites();
 
+    // Initial sync from URL (redundant due to above useEffect, but ensures clean start if needed)
+    const category = searchParams.get("category");
+    const search = searchParams.get("search") || searchParams.get("q");
+    if (category) setSelectedCategory(category);
+    if (search) setSearchQuery(search);
+
+    loadRecentlyViewed();
     return () => {
-      if (slideshowRef.current) clearInterval(slideshowRef.current);
       if (securityCheckInterval.current)
         clearInterval(securityCheckInterval.current);
     };
@@ -353,8 +410,8 @@ export default function Marketplace() {
 
   const loadContactHistory = async (userId: string) => {
     try {
-      const { data: history, error } = await supabase
-        .from("contact_sessions")
+      const { data: history, error } = await (supabase
+        .from("contact_sessions") as any)
         .select("*")
         .eq("buyer_id", userId)
         .order("created_at", { ascending: false })
@@ -365,6 +422,22 @@ export default function Marketplace() {
     } catch (error) {
       console.error("Error loading contact history:", error);
     }
+  };
+
+  const fetchCounties = async () => {
+    // We now use local JSON data for consistency with product upload
+    const countiesData = (kenyanLocations as any).counties.map((c: any) => ({
+      id: c.id,
+      name: c.name
+    }));
+    setCounties(countiesData);
+  };
+  
+  const getNeighborhoodsForCounty = (countyIdOrName: string) => {
+    const county = (kenyanLocations as any).counties.find(
+      (c: any) => c.id === countyIdOrName || c.name === countyIdOrName
+    );
+    return county?.locations || [];
   };
 
   const loadProducts = async () => {
@@ -387,12 +460,65 @@ export default function Marketplace() {
           total_ratings,
           created_at,
           phone,
-          whatsapp
+          whatsapp,
+          username
         )
       `
         )
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%,county.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`);
+      }
+
+      // Apply Filters
+      if (selectedCategory && selectedCategory !== "All") {
+        query = query.eq("category", selectedCategory);
+      }
+
+      // Price Range - Ensure we handle 0 correctly
+      if (priceRange[0] > 0) {
+        query = query.gte("price", priceRange[0]);
+      }
+      if (priceRange[1] < 1000000) {
+        query = query.lte("price", priceRange[1]);
+      }
+
+      // Location filters
+      if (countyFilter) {
+        query = query.ilike("county", `%${countyFilter}%`);
+      }
+      
+      if (neighborhoodFilter) {
+        query = query.ilike("location", `%${neighborhoodFilter}%`);
+      }
+
+      // Conditions
+      if (conditionFilter.length > 0) {
+        query = query.in("condition", conditionFilter);
+      }
+
+      // Verified
+      if (verifiedOnly) {
+        query = query.eq("verified", true);
+      }
+
+      // Apply Smart Sorting
+      switch (sortBy) {
+        case "lowest-price":
+          query = query.order("price", { ascending: true });
+          break;
+        case "highest-price":
+          query = query.order("price", { ascending: false });
+          break;
+        case "trending":
+          query = query.order("featured", { ascending: false }).order("created_at", { ascending: false });
+          break;
+        default:
+          query = query.order("created_at", { ascending: false });
+      }
+
+      query = query
         .in("status", ["active", "approved"])
-        .order("created_at", { ascending: false })
         .limit(100);
 
       const { data: productsData, error } = await query;
@@ -400,12 +526,19 @@ export default function Marketplace() {
       if (error) throw error;
 
       if (productsData && productsData.length > 0) {
+        // We handle verified prioritization via Sort usually, but existing logic does it via JS sort
+        // Let's keep existing prioritization OR improve it. 
+        // Existing logic:
         const verifiedProducts = productsData.filter((p) => p.verified);
         const nonVerifiedProducts = productsData.filter((p) => !p.verified);
         const prioritizedProducts = [
           ...verifiedProducts,
           ...nonVerifiedProducts,
         ];
+
+        // No need to re-filter by category/search here since DB did it (mostly)
+        // But the previous implementation filtered by category in JS 'filteredProducts' instead of DB. 
+        // We are moving filtering to DB for performance.
         setProducts(prioritizedProducts);
       } else {
         setProducts([]);
@@ -417,6 +550,27 @@ export default function Marketplace() {
       setIsLoading(false);
     }
   };
+
+  // Debounce effect for filters
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadProducts();
+    }, 500); // 500ms debounce
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCategory, priceRange, countyFilter, neighborhoodFilter, conditionFilter, verifiedOnly]);
+
+  // Effect for Search Suggestions
+  useEffect(() => {
+    if (searchQuery.length > 1) {
+      const suggestions = categories
+        .filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()) && c !== "All")
+        .slice(0, 5);
+      setSearchSuggestions(suggestions);
+    } else {
+      setSearchSuggestions([]);
+    }
+  }, [searchQuery]);
+
 
   const loadUserFavorites = async () => {
     try {
@@ -452,8 +606,8 @@ export default function Marketplace() {
       } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data: session, error } = await supabase
-        .from("contact_sessions")
+      const { data: session, error } = await (supabase
+        .from("contact_sessions") as any)
         .select("*")
         .eq("product_id", productId)
         .eq("buyer_id", user.id)
@@ -512,7 +666,7 @@ export default function Marketplace() {
       }
 
       // Create contact session
-      await createContactSession(user.id, contactType);
+      await createNewContactSession(user.id, contactType);
     } catch (error: any) {
       console.error("Error revealing contact:", error);
       handleDatabaseError(error, "revealing contact");
@@ -521,7 +675,7 @@ export default function Marketplace() {
     }
   };
 
-  const createContactSession = async (
+  const createNewContactSession = async (
     userId: string,
     contactType: "phone" | "whatsapp"
   ) => {
@@ -550,8 +704,8 @@ export default function Marketplace() {
       }
 
       // Create contact session
-      const { data: session, error: createError } = await supabase
-        .from("contact_sessions")
+      const { data: session, error: createError } = await (supabase
+        .from("contact_sessions") as any)
         .insert({
           product_id: selectedProduct!.id,
           buyer_id: userId,
@@ -620,15 +774,45 @@ export default function Marketplace() {
     return `Expires in ${diffMinutes}m`;
   };
 
-  const filteredProducts = products.filter((p) => {
-    const matchesCategory =
-      selectedCategory === "All" || p.category === selectedCategory;
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  /* filteredProducts logic removed - now handled by DB query */
 
-    return matchesCategory && matchesSearch;
-  });
+  const loadRecentlyViewed = async () => {
+    try {
+      const recentlyViewedIdsStr = localStorage.getItem("recently_viewed") || "[]";
+      const recentlyViewedIds = JSON.parse(recentlyViewedIdsStr);
+
+      if (recentlyViewedIds.length === 0) {
+        setRecentlyViewed([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          *,
+          profiles:user_id(
+            id,
+            full_name,
+            avatar_url,
+            rating,
+            total_ratings
+          )
+        `)
+        .in("id", recentlyViewedIds)
+        .in("status", ["active", "approved"]);
+
+      if (error) throw error;
+
+      // Sort according to the order in recentlyViewedIds
+      const sortedData = recentlyViewedIds
+        .map((id: string) => data?.find((p) => p.id === id))
+        .filter(Boolean) as Product[];
+
+      setRecentlyViewed(sortedData);
+    } catch (error) {
+      console.error("Error loading recently viewed products:", error);
+    }
+  };
 
   const toggleFavorite = async (productId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1081,7 +1265,7 @@ export default function Marketplace() {
     if (!selectedProduct || !currentUserProfile) return;
 
     try {
-      const { error } = await supabase.from("blocked_users").insert({
+      const { error } = await (supabase.from("blocked_users") as any).insert({
         blocker_id: currentUserProfile.id,
         blocked_id: selectedProduct.user_id,
         reason: "manual_block",
@@ -1143,6 +1327,11 @@ export default function Marketplace() {
     }
   };
 
+  /* Restored Helper Functions */
+
+
+
+
   const getSellerRating = (profile: any) => {
     if (!profile?.rating || !profile?.total_ratings) return null;
     return {
@@ -1161,42 +1350,7 @@ export default function Marketplace() {
     });
   };
 
-  const nextImage = () => {
-    if (!selectedProduct?.images) return;
-    setCurrentImageIndex((prev) =>
-      prev === selectedProduct.images.length - 1 ? 0 : prev + 1
-    );
-  };
 
-  const prevImage = () => {
-    if (!selectedProduct?.images) return;
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? selectedProduct.images.length - 1 : prev - 1
-    );
-  };
-
-  const goToImage = (index: number) => {
-    setCurrentImageIndex(index);
-  };
-
-  const toggleSlideshow = () => {
-    if (isSlideshowPlaying) {
-      if (slideshowRef.current) {
-        clearInterval(slideshowRef.current);
-        slideshowRef.current = null;
-      }
-      setIsSlideshowPlaying(false);
-    } else {
-      if (selectedProduct?.images && selectedProduct.images.length > 1) {
-        slideshowRef.current = setInterval(() => {
-          setCurrentImageIndex((prev) =>
-            prev === selectedProduct.images.length - 1 ? 0 : prev + 1
-          );
-        }, 3000);
-        setIsSlideshowPlaying(true);
-      }
-    }
-  };
 
   const openContact = async (product: Product, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1210,19 +1364,7 @@ export default function Marketplace() {
     setContactModalOpen(true);
   };
 
-  const openProductDetails = async (product: Product) => {
-    setSelectedProduct(product);
-    setProductDetailModalOpen(true);
-    setCurrentImageIndex(0);
-    setIsSlideshowPlaying(false);
-
-    if (slideshowRef.current) {
-      clearInterval(slideshowRef.current);
-      slideshowRef.current = null;
-    }
-
-    await trackProductView(product.id);
-  };
+  /* Open Product Details Modal (Logic moved to restored functions section) */
 
   const openReviews = async (product: Product, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1249,14 +1391,7 @@ export default function Marketplace() {
     await loadMessages(product.id);
   };
 
-  const handleCloseProductModal = () => {
-    setProductDetailModalOpen(false);
-    setIsSlideshowPlaying(false);
-    if (slideshowRef.current) {
-      clearInterval(slideshowRef.current);
-      slideshowRef.current = null;
-    }
-  };
+
 
   const handleCloseContactModal = () => {
     setContactModalOpen(false);
@@ -1267,271 +1402,145 @@ export default function Marketplace() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // SIMPLIFIED Contact Modal - No verification
-  const ContactModal = () => (
-    <Dialog open={contactModalOpen} onOpenChange={handleCloseContactModal}>
-      <DialogContent className="max-w-md p-0">
-        <div className="flex flex-col max-h-[85vh]">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Phone className="h-5 w-5" />
-              Contact Seller
-            </DialogTitle>
-            <DialogDescription className="truncate">
-              {selectedProduct?.name}
-            </DialogDescription>
-          </DialogHeader>
 
-          <ScrollArea className="flex-1 px-6">
-            <div className="py-4 space-y-4">
-              {/* Network Warning */}
-              {showNetworkWarning && (
-                <div
-                  className={`p-3 rounded-lg ${networkSecurity === "danger"
-                    ? "bg-red-50 border border-red-200"
-                    : "bg-amber-50 border border-amber-200"
-                    }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        {networkSecurity === "danger"
-                          ? "Insecure Connection"
-                          : "Weak Connection"}
-                      </p>
-                      <p className="text-xs mt-1">
-                        {networkSecurity === "danger"
-                          ? "Connect to a secure network to contact sellers"
-                          : "Your connection may be slow"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Seller Info */}
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={selectedProduct?.profiles?.avatar_url} />
-                    <AvatarFallback>
-                      {selectedProduct?.profiles?.full_name?.[0] || "S"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-semibold">
-                      {selectedProduct?.profiles?.full_name || "Seller"}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {selectedProduct?.verified && (
-                        <Badge variant="secondary" className="text-xs">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Verified Seller
-                        </Badge>
-                      )}
-                      {getSellerRating(selectedProduct?.profiles) && (
-                        <div className="flex items-center text-sm">
-                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 mr-1" />
-                          {getSellerRating(
-                            selectedProduct?.profiles
-                          )?.rating.toFixed(1)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+  /* Restored Helper Functions */
 
-              {/* Contact Options - SIMPLIFIED */}
-              <div className="space-y-3">
-                {/* Call Option */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <Phone className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Call Seller</p>
-                        <p className="text-sm text-gray-600">
-                          Direct phone call
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    {activeContactSession?.contact_type === "phone" ? (
-                      <div className="space-y-3">
-                        <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <p className="text-2xl font-bold font-mono">
-                            {formatMaskedNumber(
-                              activeContactSession.revealed_contact
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {formatExpiryTime(activeContactSession.expires_at)}
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            className="bg-green-600 hover:bg-green-700"
-                            onClick={() => {
-                              const cleanNumber =
-                                activeContactSession.revealed_contact.replace(
-                                  /\D/g,
-                                  ""
-                                );
-                              window.location.href = `tel:${cleanNumber}`;
-                            }}
-                          >
-                            <Phone className="h-4 w-4 mr-2" />
-                            Call Now
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              navigator.clipboard.writeText(
-                                activeContactSession.revealed_contact
-                              );
-                              toast({ title: "Number copied to clipboard" });
-                            }}
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        className="w-full bg-green-600 hover:bg-green-700"
-                        onClick={() => revealContactNumber("phone")}
-                        disabled={
-                          isRevealingNumber || networkSecurity === "danger"
-                        }
-                      >
-                        {isRevealingNumber
-                          ? "Processing..."
-                          : "Show Phone Number"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
+  // Product Detail Modal Functions (MISSING - was causing crash)
+  const openProductDetails = (product: Product) => {
+    setSelectedProduct(product);
+    setCurrentImageIndex(0);
+    setIsSlideshowPlaying(false);
+    setProductDetailModalOpen(true);
+    trackProductView(product.id);
+    loadSimilarProducts(product);
+    // Reset scroll to top
+    setTimeout(() => {
+      modalContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 100);
+  };
 
-                {/* WhatsApp Option */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <MessageCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Chat on WhatsApp</p>
-                        <p className="text-sm text-gray-600">
-                          Direct messaging
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <Button
-                      className="w-full bg-[#25D366] hover:bg-[#1da851] text-white"
-                      onClick={async () => {
-                        if (activeContactSession?.contact_type === "whatsapp") {
-                          const message = `Hi, I'm interested in your product "${selectedProduct?.name}"`;
-                          const cleanNumber =
-                            activeContactSession.revealed_contact.replace(
-                              /\D/g,
-                              ""
-                            );
-                          window.open(
-                            `https://wa.me/${cleanNumber}?text=${encodeURIComponent(
-                              message
-                            )}`,
-                            "_blank"
-                          );
-                        } else {
-                          await revealContactNumber("whatsapp");
-                        }
-                      }}
-                      disabled={networkSecurity === "danger"}
-                    >
-                      <MessageCircle className="h-5 w-5 mr-2" />
-                      {activeContactSession?.contact_type === "whatsapp"
-                        ? "Chat Now"
-                        : "Show WhatsApp"}
-                    </Button>
-                  </div>
-                </div>
+  const handleCloseProductModal = () => {
+    setProductDetailModalOpen(false);
+    setIsSlideshowPlaying(false);
+    setCurrentImageIndex(0);
+  };
 
-                {/* In-App Message */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="p-4">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        handleCloseContactModal();
-                        if (selectedProduct) openMessages(selectedProduct);
-                      }}
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Send Message in App
-                    </Button>
-                  </div>
-                </div>
-              </div>
+  const prevImage = () => {
+    if (!selectedProduct?.images) return;
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? selectedProduct.images.length - 1 : prev - 1
+    );
+  };
 
-              {/* Safety Notice */}
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-amber-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-800">
-                      Safety Tips
-                    </p>
-                    <ul className="text-xs text-amber-700 mt-1 space-y-1">
-                      <li>• Meet in public places during daylight</li>
-                      <li>• Inspect items before payment</li>
-                      <li>• Report suspicious activity</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+  const nextImage = () => {
+    if (!selectedProduct?.images) return;
+    setCurrentImageIndex((prev) =>
+      prev === selectedProduct.images.length - 1 ? 0 : prev + 1
+    );
+  };
 
-              {/* Report option */}
-              {currentUserProfile && (
-                <div>
-                  <Button
-                    variant="ghost"
-                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => {
-                      handleCloseContactModal();
-                      setShowReportModal(true);
-                    }}
-                  >
-                    <Flag className="h-4 w-4 mr-2" />
-                    Report Seller
-                  </Button>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+  const goToImage = (index: number) => {
+    setCurrentImageIndex(index);
+    setIsSlideshowPlaying(false);
+  };
 
-          <div className="px-6 pb-6 pt-4 border-t flex-shrink-0">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleCloseContactModal}
-            >
-              Close
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+  const toggleSlideshow = () => {
+    setIsSlideshowPlaying((prev) => !prev);
+  };
 
+  const loadSimilarProducts = async (currentProduct: Product) => {
+    try {
+      // AI Logic: Match category AND try to match partial name words
+      const words = currentProduct.name.split(" ").filter(w => w.length > 3).slice(0, 2);
+
+      let query = supabase
+        .from("products")
+        .select(`
+          *,
+          profiles:user_id(
+            id,
+            full_name,
+            avatar_url,
+            rating,
+            total_ratings
+          )
+        `)
+        .neq("id", currentProduct.id)
+        .in("status", ["active", "approved"]);
+
+      // Construct a smart query
+      if (words.length > 0) {
+        const wordFilters = words.map(w => `name.ilike.%${w}%`).join(",");
+        query = query.or(`category.eq."${currentProduct.category}",${wordFilters}`);
+      } else {
+        query = query.eq("category", currentProduct.category);
+      }
+
+      let { data, error } = await query
+        .order("featured", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      if (error) throw error;
+
+      // Fallback: If no smart matches, just get anything from the same category
+      if (!data || data.length === 0) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("products")
+          .select(`
+            *,
+            profiles:user_id(
+              id,
+              full_name,
+              avatar_url,
+              rating,
+              total_ratings
+            )
+          `)
+          .neq("id", currentProduct.id)
+          .eq("category", currentProduct.category)
+          .in("status", ["active", "approved"])
+          .order("created_at", { ascending: false })
+          .limit(4);
+
+        if (fallbackError) throw fallbackError;
+        data = fallbackData;
+      }
+
+      setSimilarProducts(data || []);
+    } catch (error) {
+      console.error("Error loading AI similar products:", error);
+    }
+  };
+
+  // Slideshow effect
+  useEffect(() => {
+    if (!isSlideshowPlaying || !selectedProduct?.images) return;
+
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) =>
+        prev === selectedProduct.images.length - 1 ? 0 : prev + 1
+      );
+    }, 3000); // Change image every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [isSlideshowPlaying, selectedProduct]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /* Restored getSignalIcon */
   const getSignalIcon = () => {
     if (isOfflineMode) return <WifiOff className="h-4 w-4" />;
     if (networkSecurity === "danger")
@@ -1601,115 +1610,298 @@ export default function Marketplace() {
             </p>
           </div>
 
-          {/* Search and Filter Section */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-8">
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              {/* Search Bar */}
-              <div className="flex-1 w-full">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input
-                    placeholder="Search for products, brands, categories..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-12 pr-4 py-3 text-lg border-2 border-gray-300 focus:border-green-500 rounded-xl transition-all"
-                  />
+          {/* Search and Filter Section - REDESIGNED */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-4 sm:p-8 mb-12 sticky top-4 z-40">
+            <div className="flex flex-col gap-6">
+              {/* Main Search Row */}
+              <div className="flex flex-col lg:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-primary to-primary/60 rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
+                    <Input
+                      placeholder="What are you looking for today?"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setIsSearchActive(true)}
+                      onBlur={() => setTimeout(() => setIsSearchActive(false), 200)}
+                      className="pl-12 pr-4 py-6 text-lg border-2 border-gray-100/80 bg-gray-50/50 rounded-2xl focus-visible:ring-2 focus-visible:ring-primary/30 shadow-inner group-focus-within:border-primary/50 transition-all"
+                    />
+                  </div>
+                    {/* Smart Search Suggestions */}
+                    {isSearchActive && (searchQuery.length > 0 || trendingSearches.length > 0) && (
+                      <div className="absolute top-full left-0 right-0 mt-4 bg-white/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 z-50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+                        {searchQuery.length > 0 && searchSuggestions.length > 0 && (
+                          <div className="p-4 border-b border-gray-100/50">
+                            <p className="text-[10px] font-black text-gray-400 px-3 py-2 uppercase tracking-[0.2em]">Suggested Categories</p>
+                            {searchSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion}
+                                className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-xl flex items-center gap-4 transition-all group"
+                                onClick={() => {
+                                  setSelectedCategory(suggestion);
+                                  setSearchQuery("");
+                                  setIsSearchActive(false);
+                                }}
+                              >
+                                <div className="bg-primary/10 p-2.5 rounded-xl group-hover:bg-primary/20 transition-colors">
+                                  <Sparkles className="h-4 w-4 text-primary" />
+                                </div>
+                                <span className="font-bold text-gray-700">{suggestion}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="p-4">
+                          <p className="text-[10px] font-black text-gray-400 px-3 py-2 uppercase tracking-[0.2em]">Trending Now</p>
+                          <div className="flex flex-wrap gap-2 p-2">
+                            {trendingSearches.map((term) => (
+                              <Button
+                                key={term}
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full border-gray-100 hover:border-primary hover:bg-primary/5 text-gray-600 px-4 font-bold text-xs"
+                                onClick={() => {
+                                  setSearchQuery(term);
+                                  loadProducts();
+                                  setIsSearchActive(false);
+                                }}
+                              >
+                                <TrendingUp className="h-3 w-3 mr-2 text-primary" />
+                                {term}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                
+                <div className="flex gap-2 w-full lg:w-auto">
+                  <Button
+                    onClick={loadProducts}
+                    className="bg-primary hover:bg-primary/90 text-white rounded-2xl h-14 px-8 flex items-center justify-center transition-all shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-95"
+                  >
+                    <Search className="h-5 w-5 mr-2" />
+                    Search
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="lg:hidden rounded-2xl h-14 w-14 p-0 border-2"
+                    onClick={() => setShowMobileFilters(!showMobileFilters)}
+                  >
+                    <Filter className="h-5 w-5" />
+                  </Button>
                 </div>
               </div>
 
-              {/* Mobile Filter Toggle */}
-              <div className="lg:hidden w-full">
-                <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border-2"
-                  onClick={() => setShowMobileFilters(!showMobileFilters)}
-                >
-                  <Filter className="h-5 w-5" />
-                  {showMobileFilters ? "Hide Filters" : "Show Filters"}
-                  {selectedCategory !== "All" && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-2 bg-green-100 text-green-700"
-                    >
-                      {selectedCategory}
-                    </Badge>
-                  )}
-                </Button>
-              </div>
-
-              {/* Favorites Badge */}
-              {favorites.size > 0 && (
-                <Badge className="bg-red-500 text-white px-4 py-2 text-sm rounded-lg">
-                  <Heart className="h-4 w-4 mr-2 fill-current" />
-                  {favorites.size} Favorites
-                </Badge>
-              )}
-            </div>
-
-            {/* Category Filters */}
-            <div
-              className={`
-                mt-6 transition-all duration-300
-                ${showMobileFilters ? "block" : "hidden"} 
-                lg:block
-              `}
-            >
-              <div className="flex flex-wrap gap-2">
-                {categories.map((cat) => (
-                  <Button
-                    key={cat}
-                    variant={selectedCategory === cat ? "default" : "outline"}
-                    className={`
-                      rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200
-                      ${selectedCategory === cat
-                        ? "bg-green-600 text-white shadow-lg"
-                        : "bg-white text-gray-700 border-2 hover:border-green-500 hover:text-green-700"
-                      }
-                    `}
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      setShowMobileFilters(false);
-                    }}
+              {/* Integrated Filters Row */}
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                {/* Category Dropdown */}
+                <div className="space-y-1.5 sm:space-y-2 col-span-1">
+                  <Label className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase ml-1">Category</Label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 rounded-xl bg-gray-50/50 border-2 border-gray-100/50 focus:border-primary/50 transition-all appearance-none outline-none text-xs sm:text-sm font-medium shadow-sm hover:border-primary/30"
                   >
-                    {cat}
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+
+                {/* County/Region Dropdown */}
+                <div className="space-y-1.5 sm:space-y-2 col-span-1">
+                  <Label className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase ml-1">County</Label>
+                  <div className="relative group">
+                    <select
+                      value={countyFilter}
+                      onChange={(e) => {
+                        setCountyFilter(e.target.value);
+                        setNeighborhoodFilter("");
+                      }}
+                      className="w-full h-10 sm:h-12 px-3 sm:px-8 rounded-xl bg-gray-50/50 border-2 border-gray-100/50 focus:border-primary/50 transition-all appearance-none outline-none text-xs sm:text-sm font-medium shadow-sm hover:border-primary/30"
+                    >
+                      <option value="">All Counties</option>
+                      {counties.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <MapPin className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400 pointer-events-none hidden sm:block group-focus-within:text-primary transition-colors" />
+                  </div>
+                </div>
+
+                {/* Neighborhood / Specific Area Dropdown */}
+                <div className="space-y-1.5 sm:space-y-2 col-span-2 lg:col-span-1">
+                  <Label className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase ml-1">Specific Area</Label>
+                  <div className="relative group">
+                    <select
+                      value={neighborhoodFilter}
+                      onChange={(e) => setNeighborhoodFilter(e.target.value)}
+                      disabled={!countyFilter}
+                      className="w-full h-10 sm:h-12 px-3 sm:px-8 rounded-xl bg-gray-50/50 border-2 border-gray-100/50 focus:border-primary/50 transition-all appearance-none outline-none text-xs sm:text-sm font-medium shadow-sm hover:border-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">{countyFilter ? "All Areas" : "Select County first"}</option>
+                      {countyFilter && getNeighborhoodsForCounty(countyFilter).map((loc: string) => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                    </select>
+                    <Search className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400 pointer-events-none hidden sm:block group-focus-within:text-primary transition-colors" />
+                  </div>
+                </div>
+
+                {/* Sort By Dropdown */}
+                <div className="space-y-1.5 sm:space-y-2 col-span-1">
+                  <Label className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase ml-1">Sort</Label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 rounded-xl bg-gray-50/50 border-2 border-gray-100/50 focus:border-primary/50 transition-all appearance-none outline-none text-xs sm:text-sm font-medium shadow-sm hover:border-primary/30"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="lowest-price">Price: Low</option>
+                    <option value="highest-price">Price: High</option>
+                    <option value="trending">Trending</option>
+                  </select>
+                </div>
+
+                {/* Price Display / Toggle Row */}
+                <div className="flex items-end gap-2 col-span-1 lg:col-span-1">
+                  <Button 
+                    variant="outline" 
+                    className="h-10 sm:h-12 w-full rounded-xl border-2 p-0 flex items-center justify-center gap-2 text-[10px] sm:text-xs font-bold uppercase"
+                    onClick={() => {
+                        setPriceRange([0, 1000000]);
+                        setCountyFilter("");
+                        setNeighborhoodFilter("");
+                        setConditionFilter([]);
+                        setVerifiedOnly(false);
+                        setSelectedCategory("All");
+                        setSearchQuery("");
+                    }}
+                    title="Reset All"
+                  >
+                    <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Reset</span>
                   </Button>
-                ))}
               </div>
             </div>
           </div>
 
-          {/* Products Grid */}
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Desktop Categories Sidebar */}
-            <aside className="hidden lg:block w-64 flex-shrink-0">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sticky top-24">
-                <h3 className="font-bold text-lg mb-4 text-gray-900">
-                  Categories
-                </h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {categories.map((cat) => (
-                    <Button
-                      key={cat}
-                      variant={selectedCategory === cat ? "default" : "ghost"}
-                      className={`
-                        w-full justify-start text-left py-3 px-4 rounded-xl transition-all
-                        ${selectedCategory === cat
-                          ? "bg-green-600 text-white shadow-md"
-                          : "text-gray-700 hover:bg-green-50 hover:text-green-700"
-                        }
-                      `}
-                      onClick={() => setSelectedCategory(cat)}
+          {/* Recently Viewed Section */}
+          {recentlyViewed.length > 0 && (
+            <div className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 rounded-xl">
+                    <History className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Recently Viewed</h2>
+                    <p className="text-gray-500 text-sm font-medium">Items you've explored recently</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-bold"
+                  onClick={() => {
+                    localStorage.removeItem("recently_viewed");
+                    setRecentlyViewed([]);
+                  }}
+                >
+                  Clear History
+                </Button>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap rounded-2xl pb-4">
+                <div className="flex gap-6">
+                  {recentlyViewed.map((product) => (
+                    <div
+                      key={`recent-${product.id}`}
+                      className="w-72 shrink-0 group cursor-pointer"
+                      onClick={() => openProductDetails(product)}
                     >
-                      {cat}
-                    </Button>
+                      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-4 shadow-md group-hover:shadow-xl transition-all duration-300">
+                        <img
+                          src={product.images?.[0] || "/placeholder.svg"}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
+                          <Badge className="bg-white/90 text-gray-900 border-0 backdrop-blur-md">View Now</Badge>
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-gray-900 truncate mb-1 group-hover:text-indigo-600 transition-colors">
+                        {product.name}
+                      </h3>
+                      <p className="text-indigo-600 font-black text-lg">
+                        KES {product.price?.toLocaleString()}
+                      </p>
+                    </div>
                   ))}
                 </div>
-              </div>
-            </aside>
+              </ScrollArea>
+              <Separator className="mt-8" />
+            </div>
+          )}
+
+          {/* Products Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Desktop Sidebar */}
+            <div className="hidden lg:block lg:col-span-1">
+              <FilterSidebar
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                priceRange={priceRange}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                priceRange={priceRange}
+                onPriceRangeChange={setPriceRange}
+                conditions={conditionFilter}
+                onConditionChange={(c) => {
+                  if (conditionFilter.includes(c)) {
+                    setConditionFilter(conditionFilter.filter(x => x !== c));
+                  } else {
+                    setConditionFilter([...conditionFilter, c]);
+                  }
+                }}
+                verifiedOnly={verifiedOnly}
+                onVerifiedChange={setVerifiedOnly}
+                selectedCounty={countyFilter}
+                onCountyChange={setCountyFilter}
+                selectedNeighborhood={neighborhoodFilter}
+                onNeighborhoodChange={setNeighborhoodFilter}
+              />
+            </div>
 
             {/* Main Products Area */}
-            <section className="flex-1">
-              {filteredProducts.length === 0 ? (
+            <div className="lg:col-span-3">
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Card key={i} className="overflow-hidden border-0 shadow-lg rounded-2xl bg-white/50 backdrop-blur-sm animate-pulse">
+                      <Skeleton className="h-64 w-full rounded-t-2xl" />
+                      <CardHeader className="pb-3 px-6 pt-6">
+                        <Skeleton className="h-7 w-3/4 mb-2" />
+                        <div className="flex justify-between">
+                          <Skeleton className="h-5 w-20" />
+                          <Skeleton className="h-5 w-24" />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pb-4 px-6">
+                        <Skeleton className="h-8 w-1/2 mb-3" />
+                        <Skeleton className="h-4 w-full mb-2" />
+                        <Skeleton className="h-4 w-2/3" />
+                      </CardContent>
+                      <CardFooter className="gap-3 pt-0 px-6 pb-6">
+                        <Skeleton className="h-10 flex-1 rounded-xl" />
+                        <Skeleton className="h-10 flex-1 rounded-xl" />
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : products.length === 0 ? (
                 <div className="text-center py-16 bg-white rounded-2xl shadow-lg border border-gray-200">
                   <Package className="h-20 w-20 text-gray-400 mx-auto mb-6" />
                   <h3 className="text-2xl font-bold mb-4 text-gray-700">
@@ -1736,181 +1928,188 @@ export default function Marketplace() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map((product) => {
+                  {products.map((product) => {
                     const sellerRating = getSellerRating(product.profiles);
                     const isFavorite = favorites.has(product.id);
 
                     return (
                       <Card
                         key={product.id}
-                        className="overflow-hidden hover:shadow-2xl transition-all duration-300 group cursor-pointer border-0 shadow-lg hover:scale-105"
+                        className="group relative overflow-hidden bg-white hover:shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] transition-all duration-700 border-none rounded-[2rem] h-full flex flex-col"
                         onClick={() => openProductDetails(product)}
                       >
-                        <article className="relative h-64 overflow-hidden">
-                          {product.images && product.images.length > 0 ? (
+                        {/* Improved Image Container */}
+                        <div className="relative aspect-[4/5] overflow-hidden m-2 rounded-[1.5rem] shadow-sm">
+                          {product.images?.[0] ? (
                             <img
                               src={product.images[0]}
-                              alt={`${product.name} - ${product.category} for sale in Kenya`}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                                e.currentTarget.nextElementSibling?.classList.remove(
-                                  "hidden"
-                                );
-                              }}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out"
                             />
-                          ) : null}
-                          <div
-                            className={`w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center ${product.images && product.images.length > 0
-                              ? "hidden"
-                              : ""
-                              }`}
-                          >
-                            <Package className="h-12 w-12 text-gray-400" />
-                          </div>
-
-                          {/* Overlay Badges */}
-                          <div className="absolute top-3 left-3 flex flex-col gap-2">
-                            {product.featured && (
-                              <Badge className="bg-yellow-500 text-white border-0 shadow-lg">
-                                <Star className="h-3 w-3 mr-1 fill-current" />
-                                Featured
-                              </Badge>
-                            )}
-                            {product.verified && (
-                              <Badge className="bg-green-500 text-white border-0 shadow-lg">
-                                <Shield className="h-3 w-3 mr-1" />
-                                Verified
-                              </Badge>
-                            )}
-                            {product.is_urgent && (
-                              <Badge className="bg-red-500 text-white border-0 shadow-lg">
-                                <Zap className="h-3 w-3 mr-1" />
-                                Urgent
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Favorite Button */}
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className={`
-                              absolute top-3 right-3 backdrop-blur-sm transition-all duration-300 h-9 w-9
-                              ${isFavorite
-                                ? "bg-red-500 hover:bg-red-600 text-white shadow-lg"
-                                : "bg-white/90 hover:bg-white text-gray-700 shadow-md"
-                              }
-                            `}
-                            onClick={(e) => toggleFavorite(product.id, e)}
-                          >
-                            <Heart
-                              className={`h-4 w-4 transition-all duration-200 ${isFavorite
-                                ? "fill-current scale-110"
-                                : "group-hover:scale-110"
-                                }`}
-                            />
-                          </Button>
-
-                          {/* Quick Actions Overlay */}
-                          <div className="absolute bottom-3 left-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <Button
-                              size="sm"
-                              className="flex-1 bg-white/90 backdrop-blur-sm text-gray-800 hover:bg-white font-medium"
-                              onClick={(e) => openContact(product, e)}
-                            >
-                              <Phone className="w-4 h-4 mr-1" />
-                              Contact
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="flex-1 bg-white/90 backdrop-blur-sm text-gray-800 hover:bg-white font-medium"
-                              onClick={() => openProductDetails(product)}
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        </article>
-
-                        <CardHeader className="pb-3 px-6 pt-6">
-                          <CardTitle className="text-xl font-bold line-clamp-2 group-hover:text-green-700 transition-colors">
-                            {product.name}
-                          </CardTitle>
-                          <CardDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                            <Badge
-                              variant="outline"
-                              className="bg-green-50 text-green-700 border-green-200 w-fit"
-                            >
-                              {product.category}
-                            </Badge>
-                            {product.location && (
-                              <span className="flex items-center text-gray-600">
-                                <MapPin className="h-4 w-4 mr-1" />
-                                {product.location}
-                              </span>
-                            )}
-                          </CardDescription>
-                        </CardHeader>
-
-                        <CardContent className="pb-4 px-6">
-                          <CompactPriceDisplay
-                            kesAmount={product.price || 0}
-                            className="mb-2"
-                          />
-                          {product.original_price &&
-                            product.original_price > product.price && (
-                              <p className="text-sm text-gray-500 line-through mb-3">
-                                KES {product.original_price.toLocaleString()}
-                              </p>
-                            )}
-                          <p className="text-gray-600 line-clamp-2 text-sm leading-relaxed">
-                            {product.description}
-                          </p>
-                          {sellerRating && (
-                            <div className="flex items-center gap-2 mt-3">
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              <span className="font-semibold text-sm">
-                                {sellerRating.rating.toFixed(1)}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                ({sellerRating.totalRatings} reviews)
-                              </span>
+                          ) : (
+                            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                              <Package className="h-12 w-12 text-gray-300" />
                             </div>
                           )}
-                        </CardContent>
 
-                        <CardFooter className="gap-3 pt-0 px-6 pb-6">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2"
-                            onClick={() => openProductDetails(product)}
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={(e) => openContact(product, e)}
-                          >
-                            <Phone className="w-4 h-4 mr-2" />
-                            Contact
-                          </Button>
-                        </CardFooter>
+                          {/* Gradient Overlays */}
+                          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent opacity-60 group-hover:h-full transition-all duration-700" />
+                          <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+
+                          {/* Top Badges */}
+                          <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
+                            <div className="flex flex-col gap-2">
+                              {product.verified && (
+                                <Badge className="bg-white/90 backdrop-blur-md text-primary shadow-xl border-none font-bold py-1.5 px-3 rounded-full animate-in slide-in-from-left duration-500">
+                                  <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+                                  Verified
+                                </Badge>
+                              )}
+                              {product.featured && (
+                                <Badge className="bg-amber-400 text-white border-none font-bold py-1.5 px-3 rounded-full shadow-lg">
+                                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                                  Elite
+                                </Badge>
+                              )}
+                              {product.original_price && product.original_price > product.price && (
+                                <Badge className="bg-orange-500 text-white border-none font-bold py-1.5 px-3 rounded-full shadow-lg animate-pulse">
+                                  <TrendingDown className="h-3.5 w-3.5 mr-1.5" />
+                                  Price Drop
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className={`h-11 w-11 rounded-full backdrop-blur-md pointer-events-auto transition-all duration-300 ${
+                                isFavorite ? "bg-red-500 text-white" : "bg-white/20 text-white hover:bg-white/40"
+                              }`}
+                              onClick={(e) => toggleFavorite(product.id, e)}
+                            >
+                              <Heart className={`h-5 w-5 ${isFavorite ? "fill-white" : ""}`} />
+                            </Button>
+                          </div>
+
+                          {/* Bottom Info Overlay */}
+                          <div className="absolute bottom-6 left-6 right-6 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-500 h-12 flex gap-2">
+                             <Button className="flex-1 bg-white text-black hover:bg-gray-100 rounded-xl h-full font-bold shadow-xl shadow-black/20" onClick={(e) => openContact(product, e)}>
+                               Contact
+                             </Button>
+                             <Button size="icon" className="w-12 h-full bg-white/20 backdrop-blur-md rounded-xl text-white hover:bg-white/30" onClick={() => openProductDetails(product)}>
+                               <Eye className="h-5 w-5" />
+                             </Button>
+                          </div>
+                        </div>
+
+                        {/* Content Section */}
+                        <div className="p-6 flex-1 flex flex-col gap-3">
+                          <div>
+                            <div className="flex justify-between items-start mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-1 block">{product.category}</span>
+                                {product.condition === 'new' && <Badge className="bg-primary/10 text-primary border-none text-[10px] h-5">NEW</Badge>}
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 line-clamp-1 group-hover:text-primary transition-colors">
+                              {product.name}
+                            </h3>
+                            {product.description && (
+                              <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
+                                {product.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between mt-auto">
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</span>
+                                    {product.original_price && product.original_price > product.price && (
+                                        <span className="text-[10px] text-gray-400 line-through font-medium">
+                                            KES {product.original_price.toLocaleString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <CompactPriceDisplay
+                                    kesAmount={product.price || 0}
+                                    className="text-2xl font-black text-gray-900"
+                                />
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <div className="flex items-center text-gray-500 text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg">
+                                    <MapPin className="h-3 w-3 mr-1 text-secondary" />
+                                    {product.location?.split(',')[0]}
+                                </div>
+                                {sellerRating && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                        <div className="flex gap-0.5">
+                                            {[...Array(5)].map((_, i) => (
+                                                <Star key={i} className={`h-2.5 w-2.5 ${i < Math.floor(sellerRating.rating) ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-2 w-full mt-4">
+                            <Button 
+                              variant="outline"
+                              className="flex-1 border-primary/20 hover:border-primary hover:bg-primary/5 text-primary rounded-2xl h-12 font-bold transition-all active:scale-95"
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  openProductDetails(product);
+                              }}
+                            >
+                               <Eye className="h-4 w-4 mr-2" />
+                               View
+                            </Button>
+                            <Button 
+                              className="flex-1 bg-secondary hover:bg-secondary/90 text-white rounded-2xl h-12 font-bold transition-all hover:shadow-[0_8px_20px_-6px_rgba(255,102,0,0.4)] active:scale-95"
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(product);
+                              }}
+                            >
+                               <ShoppingCart className="h-4 w-4 mr-2" />
+                               Quick Add
+                            </Button>
+                          </div>
+                        </div>
                       </Card>
                     );
                   })}
                 </div>
               )}
-            </section>
+            </div>
           </div>
         </div>
 
         {/* Modals */}
-        <ContactModal />
+        <ContactSellerDialog
+          open={contactModalOpen}
+          onOpenChange={setContactModalOpen}
+          sellerProfile={activeContactSession ? {
+            full_name: selectedProduct?.profiles?.full_name || "Seller",
+            username: "Seller",
+            phone: activeContactSession.revealed_contact,
+            profile_image: selectedProduct?.profiles?.avatar_url || ""
+          } : {
+            // Fallback if no active session, but dialog handles "null" gracefully?
+            // Actually, Marketplace flow forces "reveal" before showing details?
+            // User wants "View details then contact seller".
+            // If I use my new dialog, it shows the number directly if available.
+            // In Marketplace, `Product` has `phone`.
+            // I should pass available info.
+            full_name: selectedProduct?.profiles?.full_name || "Seller",
+            username: "Seller",
+            phone: selectedProduct?.phone || selectedProduct?.profiles?.phone || "",
+            whatsapp: selectedProduct?.whatsapp || selectedProduct?.profiles?.whatsapp || "",
+            profile_image: selectedProduct?.profiles?.avatar_url || ""
+          }}
+          product={{
+            name: selectedProduct?.name || "",
+            price: selectedProduct?.price || 0,
+            currency: "KES"
+          }}
+        />
 
         {/* Report Modal */}
         <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
@@ -1966,9 +2165,12 @@ export default function Marketplace() {
           open={productDetailModalOpen}
           onOpenChange={handleCloseProductModal}
         >
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent 
+            className="max-w-[95vw] sm:max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto"
+            ref={modalContentRef}
+          >
             {selectedProduct && (
-              <>
+              <div className="animate-in fade-in duration-500">
                 <DialogHeader>
                   <DialogTitle className="text-xl sm:text-2xl">
                     {selectedProduct.name}
@@ -2209,7 +2411,7 @@ export default function Marketplace() {
                     <div className="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4">
                       <Button
                         size="sm"
-                        className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+                        className="flex-1 bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm h-9 sm:h-10"
                         onClick={() => {
                           setProductDetailModalOpen(false);
                           openContact(selectedProduct);
@@ -2219,13 +2421,21 @@ export default function Marketplace() {
                         Contact Seller
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
-                        className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+                        className="flex-1 border-primary/20 hover:border-primary hover:bg-primary/5 text-primary text-xs sm:text-sm h-9 sm:h-10"
                         onClick={() => openMessages(selectedProduct)}
                       >
                         <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                         Message
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-secondary hover:bg-secondary/90 text-white text-xs sm:text-sm h-9 sm:h-10 border-none shadow-lg shadow-secondary/20"
+                        onClick={() => addToCart(selectedProduct)}
+                      >
+                        <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        Add to Cart
                       </Button>
                       <Button
                         size="icon"
@@ -2255,9 +2465,65 @@ export default function Marketplace() {
                       <Star className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       View Reviews
                     </Button>
+
+                    {/* Similar Products Section */}
+                    {similarProducts.length > 0 && (
+                      <div className="pt-6 border-t mt-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-bold text-lg flex items-center gap-2">
+                            <div className="bg-primary/10 p-1.5 rounded-lg">
+                              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                            </div>
+                            Smart Recommendations
+                            <Badge className="bg-gradient-to-r from-primary to-primary/60 text-[10px] uppercase h-5 border-none">AI Driven</Badge>
+                          </h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          {similarProducts.map((similar) => (
+                            <div 
+                              key={similar.id}
+                              className="group cursor-pointer bg-gray-50 rounded-xl p-2 border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all"
+                              onClick={() => {
+                                setSelectedProduct(similar);
+                                setCurrentImageIndex(0);
+                                loadSimilarProducts(similar);
+                                // Ensure we scroll back to the top of the new product
+                                if (modalContentRef.current) {
+                                  modalContentRef.current.scrollTo({ top: 0, behavior: "smooth" });
+                                }
+                              }}
+                            >
+                              <div className="aspect-square rounded-lg overflow-hidden mb-2 relative">
+                                {similar.images && similar.images.length > 0 ? (
+                                  <img 
+                                    src={similar.images[0]} 
+                                    alt={similar.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                    <Package className="h-8 w-8 text-gray-400" />
+                                  </div>
+                                )}
+                                <div className="absolute bottom-1 right-1">
+                                  <Badge className="bg-primary text-[10px] px-1.5 py-0 h-4 border-none">
+                                    KES {similar.price?.toLocaleString()}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <h4 className="text-xs font-semibold truncate group-hover:text-green-700 transition-colors">{similar.name}</h4>
+                              <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                <MapPin className="h-2 w-2" />
+                                {similar.location}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </DialogContent>
         </Dialog>
@@ -2549,6 +2815,7 @@ export default function Marketplace() {
             )}
           </DialogContent>
         </Dialog>
+        </div>
       </main>
     </>
   );

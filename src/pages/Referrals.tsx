@@ -41,8 +41,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { convertKESToPi, formatPi } from "@/lib/pi-utils";
-import { PiIcon } from "@/components/PiLogo";
 import { QRCodeGenerator } from "@/components/referrals/QRCodeGenerator";
 import { UTMLinkBuilder } from "@/components/referrals/UTMLinkBuilder";
 import { SocialTemplates } from "@/components/referrals/SocialTemplates";
@@ -127,7 +125,6 @@ const CalculatorSection = ({ rewardTiers, currentReferrals }: { rewardTiers: Rew
   };
 
   const projectedEarnings = calculateprojectedEarnings(inviteCount);
-  const piEarnings = convertKESToPi(projectedEarnings);
 
   return (
     <div className="space-y-4 sm:space-y-8">
@@ -156,12 +153,6 @@ const CalculatorSection = ({ rewardTiers, currentReferrals }: { rewardTiers: Rew
           <p className="text-green-100 font-medium mb-1 relative z-10 text-sm sm:text-base">Potential Earnings</p>
           <div className="flex flex-col gap-1 relative z-10">
             <span className="text-2xl sm:text-4xl md:text-5xl font-bold">KES {projectedEarnings.toLocaleString()}</span>
-            <div className="flex items-center gap-2 mt-1">
-              <PiIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-200" />
-              <span className="text-base sm:text-xl font-medium text-purple-100">
-                {formatPi(projectedEarnings > 0 ? piEarnings : 0)}
-              </span>
-            </div>
           </div>
           <p className="mt-3 sm:mt-4 text-xs sm:text-sm text-green-50 relative z-10 opacity-90">
             *Based on your current tier progression
@@ -175,7 +166,7 @@ const CalculatorSection = ({ rewardTiers, currentReferrals }: { rewardTiers: Rew
           </p>
           <div className="mt-3 sm:mt-4 px-3 sm:px-4 py-2 bg-yellow-50 rounded-xl border border-yellow-100 inline-flex flex-wrap items-center justify-center gap-1 sm:gap-2">
             <span className="text-xs sm:text-sm text-yellow-700 font-semibold">Gold Tier:</span>
-            <span className="text-xs sm:text-sm font-bold text-yellow-800">KES 150 <span className="text-xs text-yellow-600">({formatPi(convertKESToPi(150))})</span></span>
+            <span className="text-xs sm:text-sm font-bold text-yellow-800">KES 150</span>
           </div>
         </div>
       </div>

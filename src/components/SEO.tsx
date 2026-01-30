@@ -16,7 +16,7 @@ interface SEOProps {
 export default function SEO({
   title,
   description,
-  keywords = "marketplace, buy, sell, Kenya, online shopping, M-Pesa, Safaricom, Pi Network, Pi Payments, Cryptocurrency, electronics, fashion, vehicles, buy with pi, sell with pi, pi network kenya, pay with pi, shop with pi, pi coin value, pi vendors kenya, pioneers kenya, 1 pi to kes, pi gcv price, global consensus value, pi network gcv, pi $314159, pi coin gcv, sellhubshop.co.ke",
+  keywords = "marketplace, buy, sell, Kenya, online shopping, M-Pesa, Safaricom, electronics, fashion, vehicles, sellhubshop.co.ke",
   image = "/og-image.png",
   url = window.location.href,
   type = "website",

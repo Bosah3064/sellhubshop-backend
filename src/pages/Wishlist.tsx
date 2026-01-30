@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ContactSellerDialog } from "@/components/dialogs/ContactSellerDialog";
 
 interface FavoriteProduct {
   id: string;
@@ -47,6 +48,8 @@ interface FavoriteProduct {
   seller_id: string;
   seller_name: string;
   seller_avatar: string | null;
+  seller_phone?: string;
+  seller_whatsapp?: string;
   condition: string;
   status: string;
   location: string;
@@ -98,7 +101,9 @@ export default function Wishlist() {
             profiles!products_user_id_fkey (
               username,
               full_name,
-              avatar_url
+              avatar_url,
+              phone,
+              whatsapp
             )
           )
         `
@@ -131,6 +136,8 @@ export default function Wishlist() {
             item.products.profiles?.username ||
             "Unknown Seller",
           seller_avatar: item.products.profiles?.avatar_url || null,
+          seller_phone: item.products.profiles?.phone,
+          seller_whatsapp: item.products.profiles?.whatsapp,
           condition: item.products.condition,
           status: item.products.status,
           location: item.products.location,
@@ -213,8 +220,24 @@ export default function Wishlist() {
       });
   };
 
+  // State for contact dialog
+  const [selectedSeller, setSelectedSeller] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [showContactDialog, setShowContactDialog] = useState(false);
+
   const handleContactSeller = (product: FavoriteProduct) => {
-    navigate(`/messages?product=${product.id}&seller=${product.seller_id}`);
+    setSelectedProduct({
+      name: product.name,
+      price: product.price,
+      currency: "KES"
+    });
+    setSelectedSeller({
+      full_name: product.seller_name,
+      profile_image: product.seller_avatar,
+      phone: product.seller_phone || "",
+      whatsapp: product.seller_whatsapp || ""
+    });
+    setShowContactDialog(true);
   };
 
   const handleBuyNow = (product: FavoriteProduct) => {
@@ -556,6 +579,12 @@ export default function Wishlist() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ContactSellerDialog
+        open={showContactDialog}
+        onOpenChange={setShowContactDialog}
+        sellerProfile={selectedSeller}
+        product={selectedProduct}
+      />
     </div>
   );
 }

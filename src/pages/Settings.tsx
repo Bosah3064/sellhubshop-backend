@@ -14,6 +14,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  Store,
 } from "lucide-react";
 import {
   Card,
@@ -93,6 +94,11 @@ export default function Settings() {
     location: "",
     bio: "",
     avatar_url: "",
+    local_delivery_fee: 200,
+    outside_delivery_fee: 350,
+    business_location: "",
+    payment_preference: "wallet",
+    mpesa_phone: "",
   });
 
   const [preferences, setPreferences] = useState({
@@ -204,6 +210,11 @@ export default function Settings() {
           location: newProfile.location || "",
           bio: newProfile.bio || "",
           avatar_url: newProfile.avatar_url || "",
+          local_delivery_fee: newProfile.local_delivery_fee ?? 200,
+          outside_delivery_fee: newProfile.outside_delivery_fee ?? 350,
+          business_location: newProfile.business_location || "",
+          payment_preference: newProfile.payment_preference || "wallet",
+          mpesa_phone: newProfile.mpesa_phone || "",
         });
       }
     } else if (profileData) {
@@ -216,6 +227,11 @@ export default function Settings() {
         location: profileData.location || "",
         bio: profileData.bio || "",
         avatar_url: profileData.avatar_url || "",
+        local_delivery_fee: profileData.local_delivery_fee ?? 200,
+        outside_delivery_fee: profileData.outside_delivery_fee ?? 350,
+        business_location: profileData.business_location || "",
+        payment_preference: profileData.payment_preference || "wallet",
+        mpesa_phone: profileData.mpesa_phone || "",
       });
     }
   };
@@ -498,6 +514,11 @@ export default function Settings() {
         location: profile.location,
         bio: profile.bio,
         avatar_url: profile.avatar_url || null,
+        local_delivery_fee: Number(profile.local_delivery_fee),
+        outside_delivery_fee: Number(profile.outside_delivery_fee),
+        business_location: profile.business_location,
+        payment_preference: profile.payment_preference,
+        mpesa_phone: profile.mpesa_phone,
         updated_at: new Date().toISOString(),
       };
 
@@ -842,6 +863,10 @@ export default function Settings() {
               <TabsTrigger value="preferences">
                 <Globe className="h-4 w-4 mr-2" />
                 Preferences
+              </TabsTrigger>
+              <TabsTrigger value="shop">
+                <Store className="h-4 w-4 mr-2" />
+                Shop Settings
               </TabsTrigger>
             </TabsList>
 
@@ -1475,6 +1500,123 @@ export default function Settings() {
                   <Button onClick={handleSavePreferences} disabled={saving}>
                     <Save className="h-4 w-4 mr-2" />
                     {saving ? "Saving..." : "Save Preferences"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="shop">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Shop & Delivery Settings</CardTitle>
+                  <CardDescription>
+                    Manage your business location and delivery fees for customers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="business_location">Business Base Location (e.g., Nairobi)</Label>
+                    <Input
+                      id="business_location"
+                      value={profile.business_location}
+                      onChange={(e) =>
+                        setProfile((prev) => ({
+                          ...prev,
+                          business_location: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Nairobi"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The city or region where your business is primarily located.
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="local_fee">Local Delivery Fee (KES)</Label>
+                      <Input
+                        id="local_fee"
+                        type="number"
+                        value={profile.local_delivery_fee}
+                        onChange={(e) =>
+                          setProfile((prev) => ({
+                            ...prev,
+                            local_delivery_fee: Number(e.target.value),
+                          }))
+                        }
+                        placeholder="200"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Fee charged for deliveries within your base location.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="outside_fee">Outside Delivery Fee (KES)</Label>
+                      <Input
+                        id="outside_fee"
+                        type="number"
+                        value={profile.outside_delivery_fee}
+                        onChange={(e) =>
+                          setProfile((prev) => ({
+                            ...prev,
+                            outside_delivery_fee: Number(e.target.value),
+                          }))
+                        }
+                        placeholder="350"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Fee charged for deliveries outside your base location.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <h3 className="font-semibold text-lg">Payment Preferences</h3>
+                    <p className="text-sm text-muted-foreground">Choose how you want to receive payments from sales.</p>
+                    
+                    <div className="space-y-2">
+                       <Label htmlFor="payment_pref">Preferred Payment Method</Label>
+                       <Select
+                          value={profile.payment_preference}
+                          onValueChange={(value) =>
+                            setProfile((prev) => ({ ...prev, payment_preference: value }))
+                          }
+                        >
+                          <SelectTrigger id="payment_pref">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="wallet">SellHub Wallet (Recommended)</SelectItem>
+                            <SelectItem value="mpesa">M-Pesa (Direct to Phone)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          "Wallet" keeps funds in your dashboard. "M-Pesa" attempts to send directly if supported, otherwise defaults to Wallet.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mpesa_phone">M-Pesa Phone Number</Label>
+                      <Input
+                        id="mpesa_phone"
+                        value={profile.mpesa_phone}
+                        onChange={(e) =>
+                          setProfile((prev) => ({
+                            ...prev,
+                            mpesa_phone: e.target.value,
+                          }))
+                        }
+                        placeholder="2547..."
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Required if you select M-Pesa as your preferred payment method.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button onClick={handleSaveProfile} disabled={saving}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {saving ? "Saving..." : "Save Shop Settings"}
                   </Button>
                 </CardContent>
               </Card>

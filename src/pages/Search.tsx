@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Search, SlidersHorizontal, X, MapPin, Star, Heart, Shield, Package } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Search, SlidersHorizontal, X, MapPin, Star, Heart, Shield, Package, ShoppingCart, Eye } from "lucide-react";
+import { useCart } from "@/hooks/useCart";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -41,6 +43,7 @@ export default function Discover() {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { addToCart } = useCart();
   const [categories, setCategories] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
@@ -646,11 +649,26 @@ export default function Discover() {
                         </div>
                       </CardContent>
                       
-                      <CardFooter className="p-4 pt-0">
-                        <Button className="w-full" size="sm">
-                          View Details
-                        </Button>
-                      </CardFooter>
+                        <CardFooter className="p-4 pt-0 flex gap-2">
+                          <Button className="flex-1" size="sm" variant="outline" asChild>
+                            <Link to="/marketplace">
+                              <Eye className="w-4 h-4 mr-2" />
+                              Details
+                            </Link>
+                          </Button>
+                          <Button 
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              addToCart(product);
+                            }}
+                          >
+                            <ShoppingCart className="w-4 h-4 mr-2" />
+                            Add
+                          </Button>
+                        </CardFooter>
                     </Card>
                   );
                 })}

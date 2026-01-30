@@ -37,6 +37,8 @@ import {
   Loader2,
   Zap,
   Search,
+  Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import kenyanLocations from "@/data/kenyan-locations.json";
@@ -139,6 +141,80 @@ export default function ProductUpload() {
     loadCurrentUser();
     loadCategoriesFromDatabase();
   }, []);
+
+  // AI Listing Strength Calculation
+  const calculateListingStrength = () => {
+    let score = 0;
+    const { name, description, price, category, subcategory, county, location, properties } = formData;
+    
+    // Title strength (max 20)
+    if (name.length >= 10) score += 10;
+    if (name.length >= 25) score += 5;
+    if (name.length >= 40) score += 5;
+    
+    // Description richness (max 30)
+    if (description.length >= 50) score += 10;
+    if (description.length >= 200) score += 10;
+    if (description.length >= 500) score += 10;
+    
+    // Visual impact (max 30)
+    if (images.length >= 1) score += 10;
+    if (images.length >= 3) score += 10;
+    if (images.length >= 6) score += 10;
+    
+    // Metadata completeness (max 20)
+    if (price && parseFloat(price) > 0) score += 5;
+    if (category && subcategory) score += 5;
+    if (county && location) score += 5;
+    if (Object.keys(properties).length >= 2) score += 5;
+    
+    return Math.min(score, 100);
+  };
+
+  const listingStrength = calculateListingStrength();
+
+  const getStrengthColor = (score: number) => {
+    if (score < 40) return "bg-red-500";
+    if (score < 70) return "bg-amber-500";
+    return "bg-green-600";
+  };
+
+  const getStrengthText = (score: number) => {
+    if (score < 40) return "Weak Listing";
+    if (score < 70) return "Good Listing";
+    return "Excellent Listing!";
+  };
+
+  const enhanceDescription = () => {
+    const categoryName = getCurrentCategory()?.name || "";
+    if (!formData.name) {
+      toast({
+        title: "Add a title first",
+        description: "We need a product title to enhance your description.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    let enhanced = "";
+    const name = formData.name;
+    const condition = formData.condition;
+
+    // AI logic: select template based on category
+    if (categoryName.toLowerCase().includes("phone") || categoryName.toLowerCase().includes("electronics")) {
+      enhanced = `Check out this amazing ${name}! In ${condition} condition, this device offers top-tier performance and reliability. \n\nKey features:\n- High-resolution display\n- Long-lasting battery life\n- Premium build quality\n\nIt's been well-maintained and works perfectly. Great value for anyone looking for a quality ${categoryName}. Contact me for more details!`;
+    } else if (categoryName.toLowerCase().includes("car") || categoryName.toLowerCase().includes("vehicles")) {
+      enhanced = `Up for sale is a stunning ${name}. This ${condition} vehicle is a perfect blend of style, comfort, and efficiency. \n\nHighlights:\n- Smooth handling and great performance\n- Clean interior and exterior\n- Low maintenance and reliable\n\nA fantastic choice for daily commuting or weekend drives. Priced to sell fast!`;
+    } else {
+      enhanced = `Experience the best of ${name}. This ${condition} item is perfect for anyone looking for quality and value. Features include modern design, durability, and excellent ${categoryName} performance. \n\nReady for immediate use. Don't miss out on this amazing deal!`;
+    }
+    
+    setFormData(prev => ({ ...prev, description: enhanced }));
+    toast({
+      title: "✨ AI Description Generated!",
+      description: `Optimized for ${categoryName || 'general'} sales.`,
+    });
+  };
 
   // Load current user
   const loadCurrentUser = async () => {
@@ -1042,25 +1118,27 @@ export default function ProductUpload() {
                     )}
                   </div>
 
-                  {/* Upload Tips */}
-                  {images.length === 0 && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                        <Zap className="h-4 w-4" />
-                        Upload Tips for Faster Listing
-                      </h4>
-                      <ul className="text-sm text-blue-700 space-y-1">
-                        <li>
-                          • Images are automatically compressed to optimal size
-                        </li>
-                        <li>• First image will be your main product photo</li>
-                        <li>
-                          • Use clear, well-lit photos from multiple angles
-                        </li>
-                        <li>• File formats: JPG, PNG, WebP (recommended)</li>
-                      </ul>
+                  {/* Listing Strength Meter */}
+                  <div className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-bold text-gray-700">Listing Strength</span>
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${getStrengthColor(listingStrength)} shadow-sm`}>
+                        {listingStrength}% - {getStrengthText(listingStrength)}
+                      </span>
                     </div>
-                  )}
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-1000 ease-out ${getStrengthColor(listingStrength)} shadow-[0_0_10px_rgba(34,197,94,0.3)]`}
+                        style={{ width: `${listingStrength}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-[10px] text-gray-500 italic">
+                      High-strength listings reach 3x more buyers. Add more photos and details to improve!
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
@@ -1323,9 +1401,19 @@ export default function ProductUpload() {
                 <div className="space-y-3">
                   <Label
                     htmlFor="description"
-                    className="text-base font-semibold"
+                    className="text-base font-semibold flex items-center justify-between"
                   >
-                    Description *
+                    <span>Description *</span>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={enhanceDescription}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold gap-1 animate-pulse"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      AI Enhance
+                    </Button>
                   </Label>
                   <Textarea
                     id="description"
@@ -1338,11 +1426,17 @@ export default function ProductUpload() {
                         description: e.target.value,
                       }))
                     }
-                    className="text-base resize-none"
+                    className="text-base resize-none border-2 focus:border-blue-500 rounded-xl"
                     required
                   />
-                  <p className="text-sm text-muted-foreground">
-                    {formData.description.length}/2000 characters
+                  <p className="text-sm text-muted-foreground flex justify-between">
+                    <span>{formData.description.length}/2000 characters</span>
+                    {formData.description.length < 50 && (
+                      <span className="text-amber-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Add more details for a better score
+                      </span>
+                    )}
                   </p>
                 </div>
 

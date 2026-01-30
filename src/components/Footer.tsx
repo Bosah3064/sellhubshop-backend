@@ -223,7 +223,7 @@ export default function Footer() {
     {
       title: "Trending",
       links: [
-        { name: "Pi Network Accepted", href: "/marketplace?search=pi" },
+        { name: "All Products", href: "/marketplace" },
         { name: "iPhones for Sale", href: "/marketplace?search=iphone" },
         { name: "Laptops Kenya", href: "/marketplace?search=laptop" },
         { name: "Shoes in Nairobi", href: "/marketplace?search=shoes" },
@@ -240,6 +240,8 @@ export default function Footer() {
         { name: "Messages", href: "/messages" },
         { name: "Reviews", href: "/reviews" },
         { name: "Settings", href: "/settings" },
+        { name: "Notifications", href: "/notifications" },
+        { name: "Help Center", href: "/help-center" },
       ],
     },
   ];
@@ -288,7 +290,7 @@ export default function Footer() {
   const legalLinks = [
     { name: "Privacy Policy", href: "/privacy" },
     { name: "Terms of Service", href: "/terms" },
-    { name: "Cookie Policy", href: "/cookies" },
+    { name: "Cookie Policy", href: "/cookie-policy" },
   ];
 
   return (

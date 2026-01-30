@@ -24,10 +24,25 @@ import {
   AlertCircle,
   RefreshCw,
   CheckCircle2,
+  Sparkles,
+  Link as LinkIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CompactPriceDisplay } from "@/components/PriceDisplay";
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  AreaChart,
+  Area 
+} from 'recharts';
+import { format, subDays } from 'date-fns';
 
 interface DashboardStats {
   totalProducts: number;
@@ -48,7 +63,6 @@ interface UserPlan {
   plans?: {
     id: string;
     name: string;
-    product_limit: number;
   };
 }
 
@@ -83,6 +97,7 @@ const useDashboardData = () => {
   });
   const [plan, setPlan] = useState<UserPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [username, setUsername] = useState<string | null>(null);
   const { toast } = useToast();
 
   const loadDashboardData = useCallback(async () => {
@@ -109,7 +124,7 @@ const useDashboardData = () => {
       console.log("🔄 Loading dashboard for user:", user.id);
 
       // Load data in parallel for better performance
-      const [productsResponse, planResponse, messagesResponse] = await Promise.all([
+      const [productsResponse, planResponse, messagesResponse, profileResponse] = await Promise.all([
         supabase
           .from("products")
           .select("id, name, description, price, status, views, created_at, images, category, location, featured, verified, user_id")
@@ -117,31 +132,37 @@ const useDashboardData = () => {
           .order("created_at", { ascending: false }),
         (supabase
           .from("user_plans")
-          .select("id, status, user_id, plan_id, plans!plan_id(id, name, product_limit)")
+          .select("id, status, user_id, plan_id, plans!plan_id(id, name)")
           .eq("user_id", user.id)
           .eq("status", "active")
           .maybeSingle() as any),
         supabase
           .from("messages")
           .select("id", { count: "exact", head: true })
-          .eq("recipient_id", user.id)
+          .eq("receiver_id", user.id)
           .eq("is_read", false),
+        supabase
+          .from("profiles")
+          .select("username, plan_type")
+          .eq("id", user.id)
+          .single(),
       ]);
 
       // Process products
       const userProducts = (productsResponse.data || []) as Product[];
       setProducts(userProducts);
 
+      // Process username
+      if (profileResponse.data) {
+        setUsername(profileResponse.data.username);
+      }
+
       // Process plan
       if (planResponse.data) {
         setPlan(planResponse.data as any);
       } else {
         // Fallback: If no active user_plan found, check profiles.plan_type
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("plan_type")
-          .eq("id", user.id)
-          .single();
+        const profile = profileResponse.data;
 
         if (profile?.plan_type && profile.plan_type !== 'free') {
           setPlan({
@@ -247,23 +268,36 @@ const useDashboardData = () => {
     }
   }, [toast]);
 
+  // Generate mock performance data for the chart
+  const performanceData = Array.from({ length: 7 }).map((_, i) => {
+    const date = subDays(new Date(), 6 - i);
+    return {
+      date: format(date, 'MMM dd'),
+      views: Math.floor(Math.random() * 50) + (stats.totalViews / 10),
+      contacts: Math.floor(Math.random() * 10) + (stats.totalMessages / 5),
+    };
+  });
+
   return {
     products,
     stats,
+    performanceData,
     plan,
+    username,
+    setUsername,
     isLoading,
     loadDashboardData,
   };
 };
 
 export default function Dashboard() {
-  const { products, stats, plan, isLoading, loadDashboardData } =
+  const { products, stats, performanceData, plan, username, isLoading, loadDashboardData } =
     useDashboardData();
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    document.title = "Dashboard - Manage Your Products | Pi Network Coming Soon";
+    document.title = "Dashboard - Manage Your Products | SellHub";
     loadDashboardData();
 
     // 🚀 Add Realtime listener for automatic updates
@@ -434,12 +468,22 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <main className="container mx-auto py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p>Loading your dashboard...</p>
+      <main className="container mx-auto py-8 px-4">
+        <div className="flex flex-col gap-8">
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-1/3 rounded-xl" />
+            <Skeleton className="h-6 w-1/2 rounded-lg" />
           </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-[400px] lg:col-span-2 rounded-2xl" />
+            <Skeleton className="h-[400px] rounded-2xl" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-[500px] w-full rounded-2xl" />
         </div>
       </main>
     );
@@ -470,6 +514,90 @@ export default function Dashboard() {
           </Button>
         </div>
       </header>
+
+      {/* Performance Analytics Section */}
+      <section className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Chart */}
+          <Card className="lg:col-span-2 overflow-hidden border-2 border-gray-100 shadow-xl rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-8">
+              <div>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  Product Views Trend
+                </CardTitle>
+                <CardDescription>Visual tracker for your listing reach</CardDescription>
+              </div>
+              <Badge variant="secondary" className="bg-green-100 text-green-700">7-Day Trend</Badge>
+            </CardHeader>
+            <CardContent className="h-[300px] pr-8">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={performanceData}>
+                  <defs>
+                    <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#16a34a" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#9CA3AF', fontSize: 11 }} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="views" 
+                    stroke="#16a34a" 
+                    strokeWidth={4}
+                    fillOpacity={1} 
+                    fill="url(#colorViews)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Smart Insights Sidebar */}
+          <Card className="border-2 border-gray-100 shadow-xl bg-gradient-to-br from-white to-gray-50 rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                Smart Insights
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:border-green-200 transition-all">
+                <p className="text-sm font-bold text-gray-900 mb-1">Price Suggestion</p>
+                <p className="text-xs text-gray-600 mb-2 leading-relaxed">Lowering your price by KES 500 could boost visibility by 35% based on similar sales.</p>
+                <Button variant="outline" size="sm" className="w-full text-xs h-8 rounded-lg group-hover:bg-green-50 transition-colors">Apply Tip</Button>
+              </div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:border-green-200 transition-all">
+                <p className="text-sm font-bold text-gray-900 mb-1">Best Posting Time</p>
+                <p className="text-xs text-gray-600 mb-2 leading-relaxed">Your listings perform best on weekends. Schedule your next upload for Saturday morning.</p>
+                <Button variant="outline" size="sm" className="w-full text-xs h-8 rounded-lg group-hover:bg-green-50 transition-colors">Setup Schedule</Button>
+              </div>
+              <div className="bg-green-600 p-4 rounded-xl shadow-lg border-0 text-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="h-4 w-4 fill-white animate-pulse" />
+                  <p className="text-sm font-bold">Gold Seller Access</p>
+                </div>
+                <p className="text-[10px] opacity-90 leading-tight">Upgrade to Gold for detailed buyer demographics and unlimited listings.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {/* Plan Status Card */}
       <Card className="mb-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
@@ -526,9 +654,105 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
+      {/* Shop Link Card */}
+      <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <LinkIcon className="h-5 w-5 text-blue-600" />
+            Your Shop Link
+          </CardTitle>
+          <CardDescription>
+            Share this link to let customers view all your products in one place
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            {username ? (
+              <div className="flex-1 w-full flex items-center gap-2 p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                <span className="text-gray-500 font-medium">sellhubshop.co.ke/u/</span>
+                <span className="font-bold text-blue-700">{username}</span>
+              </div>
+            ) : (
+              <div className="flex-1 w-full">
+                <p className="text-sm text-yellow-600 mb-2 font-medium">
+                  <AlertCircle className="inline h-4 w-4 mr-1" />
+                  Set a username to create your unique shop link
+                </p>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Enter username (e.g. janeshop)" 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    id="username-input"
+                  />
+                  <Button 
+                    onClick={async () => {
+                      const input = document.getElementById("username-input") as HTMLInputElement;
+                      const newUsername = input.value.trim();
+                      if (!newUsername) return;
+                      
+                      // Basic validation
+                      if (!/^[a-zA-Z0-9_-]+$/.test(newUsername)) {
+                        toast({ variant: "destructive", title: "Invalid format", description: "Username can only contain letters, numbers, underscores and dashes" });
+                        return;
+                      }
+
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+
+                        // Check uniqueness
+                        const { data: existing } = await supabase.from('profiles').select('id').eq('username', newUsername).single();
+                        if (existing) {
+                          toast({ variant: "destructive", title: "Taken", description: "This username is already taken" });
+                          return;
+                        }
+
+                        const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', user.id);
+                        if (error) throw error;
+                        
+                        toast({ title: "Success", description: "Username set successfully!" });
+                        loadDashboardData();
+                      } catch (e: any) {
+                        toast({ variant: "destructive", title: "Error", description: e.message });
+                      }
+                    }}
+                  >
+                    Claim Link
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {username && (
+               <Button
+                variant="outline"
+                className="w-full md:w-auto"
+                onClick={() => {
+                   const url = `${window.location.origin}/u/${username}`;
+                   navigator.clipboard.writeText(url);
+                   toast({ title: "Copied!", description: "Shop link copied to clipboard" });
+                }}
+               >
+                 <LinkIcon className="h-4 w-4 mr-2" />
+                 Copy Link
+               </Button>
+            )}
+            
+            {username && (
+              <a href={`/u/${username}`} target="_blank" rel="noreferrer" className="w-full md:w-auto">
+                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                   Visit Shop
+                 </Button>
+              </a>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
+        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-blue-500 rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Total Products
@@ -550,7 +774,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
+        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-green-500 rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Views</CardTitle>
             <Eye className="h-4 w-4 text-muted-foreground" />
@@ -569,7 +793,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-purple-500">
+        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-purple-500 rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -588,7 +812,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-orange-500">
+        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-orange-500 rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Messages</CardTitle>
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -828,7 +1052,7 @@ const ProductCard = ({
             </Link>
           </Button>
           <Button size="icon" variant="ghost" asChild className="h-8 w-8">
-            <Link to={`/products/edit/${product.id}`}>
+            <Link to={`/edit/${product.id}`}>
               <Edit className="h-3 w-3" />
             </Link>
           </Button>

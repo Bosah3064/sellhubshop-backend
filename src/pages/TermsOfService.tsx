@@ -7,7 +7,7 @@ export default function TermsOfService() {
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="text-center mb-8">
           <Badge className="mb-4 bg-green-100 text-green-700 border-0">
-            Last Updated: January 15, 2025
+            Last Updated: January 20, 2025
           </Badge>
           <h1 className="text-4xl md:text-5xl font-black mb-6 text-gray-900">
             Terms of Service
@@ -53,7 +53,29 @@ export default function TermsOfService() {
 
               <section className="mb-8">
                 <h2 className="text-2xl font-bold mb-4 text-gray-900">
-                  4. Prohibited Activities
+                  4. Payments
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  We accept the following payment methods for subscriptions and services:
+                </p>
+                <ul className="list-disc list-inside text-gray-600 mb-4 space-y-2">
+                  <li><strong>M-Pesa:</strong> Mobile money payments processed via Safaricom's Lipa Na M-Pesa. Payments are in Kenyan Shillings (KES).</li>
+                  <li><strong>SellHub Wallet:</strong> Payments can be made using funds pre-loaded into your SellHub account wallet.</li>
+                </ul>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900">
+                  5. Refunds
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Payments may be eligible for refunds within 7 days of purchase for unused subscription time or non-delivered items. Contact support for refund requests.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900">
+                  6. Prohibited Activities
                 </h2>
                 <p className="text-gray-600 mb-4">
                   You agree not to engage in illegal activities, fraud,

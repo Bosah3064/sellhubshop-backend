@@ -82,7 +82,9 @@ class PaymentService {
 
   async initiateMpesaPayment(phoneNumber: string, request: MpesaPaymentRequest): Promise<MpesaPaymentResponse> {
     try {
-      console.log('🚀 Initiating M-Pesa payment:', { phoneNumber, ...request });
+      if (import.meta.env.DEV) {
+        console.log('🚀 Initiating M-Pesa payment:', { phoneNumber: '***', ...request });
+      }
 
       // Ensure phone number starts with 254
       let formattedPhone = phoneNumber.replace(/\D/g, '');
@@ -131,7 +133,9 @@ class PaymentService {
         body: JSON.stringify({ checkoutRequestID }),
       });
 
-      console.log('📊 M-Pesa payment status result:', result);
+      if (import.meta.env.DEV) {
+        console.log('📊 M-Pesa payment status result:', result);
+      }
 
       const resultCode = String(result.ResultCode || result.resultCode);
 

@@ -147,13 +147,33 @@ const useProfileData = (email?: string, id?: string) => {
         if (profileError) throw profileError;
         profileData = data;
       } else if (id) {
-        const { data, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (profileError) throw profileError;
-        profileData = data;
+        // Check if id is a UUID
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        
+        if (isUuid) {
+          const { data, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", id)
+            .single();
+          if (profileError) throw profileError;
+          profileData = data;
+        } else {
+          // Assume it's a username
+          const { data, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("username", id)
+            .single();
+            
+          if (profileError) {
+             console.log("Error checking username:", profileError);
+             // If username not found, try regarding it as a legacy ID or redirect to search?
+             // For now throw error
+             throw new Error("User not found by username");
+          }
+          profileData = data;
+        }
       } else {
         throw new Error("Profile identifier required");
       }
@@ -172,7 +192,7 @@ const useProfileData = (email?: string, id?: string) => {
         supabase
           .from("products")
           .select(
-            "id, name, price, images, condition, views_count, likes_count, video_url, status"
+            "id, name, price, images, condition, views_count, likes_count, video_url, status, category, description, location, created_at, owner_id, comments_count, shares_count"
           )
           .eq("owner_id", profileData.id)
           .in("status", ["active", "approved"])
@@ -362,13 +382,15 @@ export default function Profile() {
 
   const handleShare = async () => {
     try {
-      const profileUrl = profile?.id
-        ? `${window.location.origin}/profile/${profile.id}`
-        : email
-          ? `${window.location.origin}/profile/email/${encodeURIComponent(
-            email!
-          )}`
-          : window.location.href;
+      const profileUrl = profile?.username
+        ? `${window.location.origin}/u/${profile.username}`
+        : profile?.id
+          ? `${window.location.origin}/profile/${profile.id}`
+          : email
+            ? `${window.location.origin}/profile/email/${encodeURIComponent(
+              email!
+            )}`
+            : window.location.href;
 
       if (navigator.share) {
         await navigator.share({
@@ -418,6 +440,7 @@ export default function Profile() {
         );
       } else {
         await supabase.from("followers").insert({
+          id: crypto.randomUUID(),
           follower_id: currentUser.id,
           following_id: profile.id,
           created_at: new Date().toISOString(),
@@ -499,6 +522,7 @@ export default function Profile() {
 
     try {
       await supabase.from("followers").insert({
+        id: crypto.randomUUID(),
         follower_id: currentUser.id,
         following_id: userId,
         created_at: new Date().toISOString(),
@@ -594,8 +618,8 @@ export default function Profile() {
             onClick={handleFollow}
             size="sm"
             className={`font-semibold transition-all shadow-lg ${isFollowing
-                ? "bg-green-600 hover:bg-green-700 text-white border-0"
-                : "bg-white text-green-600 border-2 border-green-600 hover:bg-green-50"
+              ? "bg-green-600 hover:bg-green-700 text-white border-0"
+              : "bg-white text-green-600 border-2 border-green-600 hover:bg-green-50"
               }`}
           >
             <Heart
@@ -738,7 +762,7 @@ export default function Profile() {
   const handleProductShare = async (e: React.MouseEvent, product: Product) => {
     e.stopPropagation(); // Prevent card click
     try {
-      const baseUrl = window.location.origin;
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
       const shareUrl = `${baseUrl}/api/share/product/${product.id}`;
       const shareText = `Check out "${product.name}" for ${formatPrice(product.price)} on MarketHub!`;
 

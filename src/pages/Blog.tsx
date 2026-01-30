@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Search, TrendingUp, Clock, Sparkles, Zap, Globe, ArrowRight, Flame } from "lucide-react";
-import { PiLogo, PiIcon } from "@/components/PiLogo";
 
 interface BlogPost {
   id: string;
@@ -23,40 +22,6 @@ export default function Blog() {
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const blogPosts: BlogPost[] = [
-    // Pi Network Posts - TRENDING
-    {
-      id: "pi-1",
-      title: "Pi Network: The Future of Cryptocurrency Payments in Kenya",
-      excerpt: "Discover how Pi Network is revolutionizing digital payments in Africa. Learn about its potential value and why millions are mining Pi daily.",
-      author: "Pi Network Kenya",
-      date: "2026-01-15",
-      category: "Pi Network",
-      image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1632&q=80",
-      readTime: "8 min read",
-      authorImage: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=80&q=80"
-    },
-    {
-      id: "pi-2",
-      title: "How to Accept Pi Payments in Your Business",
-      excerpt: "A complete guide to integrating Pi Network payments into your marketplace listings. Get ready for the mainnet launch with these essential steps.",
-      author: "SellHubShop Team",
-      date: "2026-01-14",
-      category: "Pi Network",
-      image: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
-      readTime: "6 min read",
-      authorImage: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=80&q=80"
-    },
-    {
-      id: "pi-3",
-      title: "Pi Network Price Predictions 2026: Expert Analysis",
-      excerpt: "What experts are saying about Pi's potential value after Open Mainnet. Understand the factors that could drive Pi's adoption and price.",
-      author: "Crypto Analyst KE",
-      date: "2026-01-12",
-      category: "Pi Network",
-      image: "https://images.unsplash.com/photo-1642790106117-e829e14a795f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
-      readTime: "10 min read",
-      authorImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80"
-    },
     // Original Posts
     {
       id: "1",
@@ -126,7 +91,7 @@ export default function Blog() {
     },
   ];
 
-  const categories = ["All", "Pi Network", "Selling Tips", "Business", "Marketing", "Customer Service", "Payments"];
+  const categories = ["All", "Selling Tips", "Business", "Marketing", "Customer Service", "Payments"];
 
   const filteredPosts = blogPosts.filter((post) => {
     const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -145,12 +110,12 @@ export default function Blog() {
       <div className="bg-gradient-to-r from-primary via-pink-500 to-primary/80 text-white py-20">
         <div className="container mx-auto px-4 text-center">
           <Badge className="mb-4 bg-white/20 text-white border-white/30">
-            <Flame className="w-3 h-3 mr-1" />
-            New Pi Network Insights
+            <Globe className="w-3 h-3 mr-1" />
+            Marketplace Insights
           </Badge>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">SellHub Insights</h1>
           <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto">
-            Expert tips, Pi Network news, and guides for successful online selling in Kenya
+            Expert tips and guides for successful online selling in Kenya
           </p>
 
           {/* Search */}
@@ -170,53 +135,15 @@ export default function Blog() {
       </div>
 
       <div className="container mx-auto px-4 py-12">
-        {/* Pi Network Trending Section */}
-        <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-2xl p-6 md:p-8 border border-purple-200 mb-12">
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <div className="bg-purple-200 p-2.5 rounded-xl">
-              <PiIcon className="w-6 h-6 fill-purple-700" />
-            </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
-                Trending: Pi Network
-              </h2>
-              <p className="text-sm text-purple-700">The future of crypto payments in Kenya</p>
-            </div>
-            <Badge className="ml-auto bg-emerald-100 text-emerald-700 border-emerald-300">
-              <Zap className="w-3 h-3 mr-1" /> HOT
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {blogPosts.filter(p => p.category === "Pi Network").slice(0, 3).map((post) => (
-              <Card key={post.id} className="bg-white border-purple-200 hover:border-purple-400 transition-all duration-300 group cursor-pointer overflow-hidden shadow-sm hover:shadow-md">
-                <div className="relative h-32 overflow-hidden">
-                  <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                </div>
-                <div className="p-4">
-                  <h3 className="text-gray-900 font-semibold text-sm line-clamp-2 group-hover:text-purple-700 transition-colors">{post.title}</h3>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                    <Clock className="w-3 h-3" />
-                    <span>{post.readTime}</span>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
         {/* Categories */}
         <div className="flex flex-wrap gap-2 md:gap-3 mb-12 justify-center">
           {categories.map((category) => (
             <Badge
               key={category}
               variant={selectedCategory === category ? "default" : "outline"}
-              className={`cursor-pointer px-4 py-2 text-sm md:text-base transition-colors hover:bg-primary/10 ${category === "Pi Network" && selectedCategory === category ? "bg-purple-600" : ""
-                }`}
+              className={`cursor-pointer px-4 py-2 text-sm md:text-base transition-colors hover:bg-primary/10`}
               onClick={() => setSelectedCategory(category)}
             >
-              {category === "Pi Network" && <PiIcon className="w-3 h-3 mr-1.5 fill-current" />}
               {category}
             </Badge>
           ))}

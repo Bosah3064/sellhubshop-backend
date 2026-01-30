@@ -13,6 +13,7 @@ import {
 import { HelmetProvider } from "react-helmet-async";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
+import { CartProvider } from "./providers/CartProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
@@ -55,6 +56,9 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const ProfileProducts = lazy(() => import("./pages/ProfileProducts"));
 const AdminBannerManager = lazy(() => import("./pages/AdminBannerManager"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Wallet = lazy(() => import("./pages/Wallet"));
+const Checkout = lazy(() => import("./pages/Checkout"));
 
 import { AdminSecurityGate as AdminSecurity } from "./components/admin/AdminSecurityGate";
 import Header from "./components/Header";
@@ -291,8 +295,9 @@ const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <BrowserRouter>
+        <CartProvider>
+          <TooltipProvider>
+            <BrowserRouter>
             <div className="flex flex-col min-h-screen">
               <Header />
               <div className="flex-grow">
@@ -318,6 +323,9 @@ const App = () => (
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/cookie-policy" element={<CookiePolicy />} />
                     <Route path="/help-center" element={<HelpCenter />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route path="/wallet" element={<Wallet />} />
+                    <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
 
                     {/* Content & Info Aliases */}
                     <Route path="/news" element={<Navigate to="/blog" replace />} />
@@ -477,9 +485,10 @@ const App = () => (
           <Toaster />
           <Sonner />
         </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </HelmetProvider>
+      </CartProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+</HelmetProvider>
 );
 
 export default App;

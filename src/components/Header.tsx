@@ -63,6 +63,8 @@ import {
   CreditCard,
 } from "lucide-react";
 import { BannerCarousel } from "@/pages/BannerCarousel";
+import { useCart } from "@/hooks/useCart";
+import { Wallet } from "lucide-react";
 
 // Types
 interface UnreadCounts {
@@ -246,6 +248,7 @@ const NavigationLinks = ({
     { to: "/referrals", icon: Gift, label: "Refer & Earn", premium: true },
     { to: "/compare", icon: TrendingUp, label: "Compare", premium: true },
     { to: "/blog", icon: FileText, label: "Insights" },
+    { to: "/help-center", icon: HeadphonesIcon, label: "Help" },
   ];
 
   return (
@@ -302,24 +305,23 @@ const SearchBar = () => {
   };
 
   return (
-    <div className="flex-1 max-w-xs sm:max-w-md lg:max-w-2xl mx-1 sm:mx-2 lg:mx-4 px-0.5 sm:px-1">
+    <div className="flex-1 w-full mx-0">
       <form onSubmit={handleSearch}>
         <div className="relative">
-          <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3.5 sm:h-4 w-3.5 sm:w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             type="text"
-            placeholder="Search..."
+            placeholder="Search products, brands, and categories..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={handleKeyPress}
-            className="w-full pl-7 sm:pl-10 pr-12 sm:pr-16 lg:pr-20 py-1.5 sm:py-2 border border-gray-200 rounded-lg sm:rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors duration-200 bg-white shadow-sm text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+            className="w-full pl-10 pr-20 py-2.5 sm:py-3 border border-gray-200 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors duration-200 bg-gray-50/50 hover:bg-white focus:bg-white shadow-sm text-sm"
           />
           <Button
             type="submit"
-            className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white px-1.5 sm:px-2 lg:px-3 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-medium transition-colors duration-200 shadow-sm hover:shadow-md h-5 sm:h-7"
+            className="absolute right-1 top-1 bottom-1 bg-green-600 hover:bg-green-700 text-white px-4 rounded-lg text-xs font-medium transition-colors duration-200 shadow-sm"
           >
-            <Search className="h-3 w-3 sm:hidden" />
-            <span className="hidden sm:inline">Search</span>
+            Search
           </Button>
         </div>
       </form>
@@ -418,6 +420,8 @@ const CompactUserActions = ({
   onSignOut: () => void;
 }) => {
   const navigate = useNavigate();
+  const { getItemCount } = useCart();
+  const cartCount = getItemCount();
 
   return (
     <div className="flex items-center gap-1">
@@ -444,6 +448,20 @@ const CompactUserActions = ({
           >
             <MessageSquare className="h-3.5 w-3.5" />
             <CountBadge count={unreadCounts.messages} type="messages" />
+          </Button>
+        </Link>
+        <Link to="/cart">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 relative text-gray-600 hover:text-green-600 hover:bg-white rounded-lg transition-colors duration-200"
+          >
+            <ShoppingCart className="h-3.5 w-3.5" />
+            {cartCount > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] text-white bg-green-600 border border-white">
+                {cartCount}
+              </Badge>
+            )}
           </Button>
         </Link>
       </div>
@@ -498,6 +516,14 @@ const CompactUserActions = ({
           >
             <UserIcon className="h-3.5 w-3.5 text-green-600" />
             My Profile
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            onClick={() => navigate("/wallet")}
+            className="flex items-center gap-2 cursor-pointer py-1.5 rounded-lg hover:bg-green-50 transition-colors text-xs"
+          >
+            <Wallet className="h-3.5 w-3.5 text-green-600" />
+            My Wallet
           </DropdownMenuItem>
 
           <DropdownMenuItem
@@ -571,6 +597,8 @@ const UserActions = ({
   onSignOut: () => void;
 }) => {
   const navigate = useNavigate();
+  const { getItemCount } = useCart();
+  const cartCount = getItemCount();
 
   const actionButtons = [
     {
@@ -598,6 +626,13 @@ const UserActions = ({
       component: "link" as const,
       to: "/wishlist",
       icon: Heart,
+    },
+    {
+      component: "link" as const,
+      to: "/cart",
+      icon: ShoppingCart,
+      count: cartCount,
+      type: "notifications" as const, // Reusing badge style
     },
   ];
 
@@ -716,6 +751,14 @@ const UserActions = ({
           </DropdownMenuItem>
 
           <DropdownMenuItem
+            onClick={() => navigate("/wallet")}
+            className="flex items-center gap-2 cursor-pointer py-2 rounded-lg hover:bg-green-50 transition-colors text-sm"
+          >
+            <Wallet className="h-3.5 w-3.5 text-green-600" />
+            <span className="font-medium">My Wallet</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
             onClick={() => navigate("/settings")}
             className="flex items-center gap-2 cursor-pointer py-2 rounded-lg hover:bg-green-50 transition-colors text-sm"
           >
@@ -781,17 +824,35 @@ const UserActions = ({
 };
 
 // Compact Guest Actions
-const GuestActions = () => (
-  <div className="hidden md:flex items-center gap-2">
-    <Link to="/pricing">
-      <Button
-        variant="ghost"
-        className="text-gray-600 hover:text-green-600 text-xs font-medium items-center gap-1 transition-colors px-2 py-1 h-7"
-      >
-        <Crown className="h-3.5 w-3.5 text-amber-500" />
-        Pricing
-      </Button>
-    </Link>
+const GuestActions = () => {
+  const { getItemCount } = useCart();
+  const cartCount = getItemCount();
+  
+  return (
+    <div className="hidden md:flex items-center gap-2">
+      <Link to="/pricing">
+        <Button
+          variant="ghost"
+          className="text-gray-600 hover:text-green-600 text-xs font-medium items-center gap-1 transition-colors px-2 py-1 h-7"
+        >
+          <Crown className="h-3.5 w-3.5 text-amber-500" />
+          Pricing
+        </Button>
+      </Link>
+      <Link to="/cart">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 relative text-gray-600 hover:text-green-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+        >
+          <ShoppingCart className="h-4 w-4" />
+          {cartCount > 0 && (
+            <Badge className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] text-white bg-green-600 border border-white">
+              {cartCount}
+            </Badge>
+          )}
+        </Button>
+      </Link>
     <Link to="/signin">
       <Button
         variant="outline"
@@ -805,8 +866,9 @@ const GuestActions = () => (
         Get Started
       </Button>
     </Link>
-  </div>
-);
+    </div>
+  );
+};
 
 // Mobile Search Component
 const MobileSearch = ({ onLinkClick }: { onLinkClick?: () => void }) => {
@@ -1046,29 +1108,6 @@ const MobileMenu = ({
   );
 };
 
-// Neon Text Component
-const NeonText = ({ text, color = "purple" }: { text: string, color?: "purple" | "gold" }) => {
-  const animationClass = color === "gold" ? "animate-neon-flicker-gold" : "animate-neon-flicker";
-  const shadowColor = color === "gold" ? "rgba(251, 191, 36, 0.5)" : "rgba(124, 58, 237, 0.5)";
-  const gradientClass = color === "gold" ? "from-yellow-200 to-yellow-400" : "from-primary to-emerald-700";
-
-  return (
-    <div className="flex">
-      {text.split("").map((char, index) => (
-        <span
-          key={index}
-          className={`${animationClass} inline-block text-transparent bg-clip-text bg-gradient-to-r ${gradientClass} hover:animate-letter-pop cursor-default transition-all duration-300`}
-          style={{
-            animationDelay: `${index * 0.1}s`,
-            textShadow: `0 0 2px ${shadowColor}`
-          }}
-        >
-          {char === " " ? "\u00A0" : char}
-        </span>
-      ))}
-    </div>
-  );
-};
 
 // Compact Promotional Bar - Hidden on mobile for better UX
 const PromotionalBar = memo(() => (
@@ -1077,10 +1116,7 @@ const PromotionalBar = memo(() => (
       <div className="flex items-center justify-center text-xs">
         <div className="flex items-center gap-1">
           <Zap className="h-3 w-3 text-yellow-300" />
-          <span className="font-medium mr-1">Exclusive Deals - </span>
-          <div className="font-bold flex">
-            <NeonText text="Pi Network Accepted Soon!" color="gold" />
-          </div>
+          <span className="font-medium mr-1">Exclusive Deals - Premium Marketplace for Everyone!</span>
         </div>
       </div>
     </div>
@@ -1126,6 +1162,9 @@ export default function Header() {
     user?.id || null
   );
 
+  const { getItemCount } = useCart();
+  const cartCount = getItemCount();
+
   const initializeUser = useCallback(async () => {
     try {
       const {
@@ -1165,109 +1204,115 @@ export default function Header() {
       <ScrollableBanner />
 
       {/* Main Header */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4 py-2 sm:py-2.5">
-        <div className="flex items-center justify-between gap-1.5 sm:gap-2 lg:gap-3">
-          {/* Logo - Optimized for all screens */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3">
+
+        {/* ROW 1: Logo and Actions */}
+        <div className="flex items-center justify-between gap-4 mb-3">
+          {/* Logo */}
           <Link
             to="/"
-            className="flex items-center gap-1 sm:gap-1.5 group flex-shrink-0 min-w-0"
+            className="flex items-center gap-1.5 group flex-shrink-0"
           >
             <img
               src={logo}
               alt="SellHubShop Logo"
               loading="eager"
-              className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg transition-all shadow-md ring-1 ring-primary/20 hover:scale-105 duration-300 flex-shrink-0"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-all shadow-md ring-1 ring-primary/20 hover:scale-105 duration-300"
             />
-            <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-sm sm:text-base lg:text-lg font-bold bg-gradient-to-r from-primary to-emerald-700 bg-clip-text text-transparent truncate">
+            <div className="flex flex-col leading-tight">
+              <span className="text-base sm:text-lg font-bold bg-gradient-to-r from-primary to-emerald-700 bg-clip-text text-transparent truncate">
                 SellHubShop
               </span>
-              <span className="text-[9px] sm:text-[10px] text-gray-500 font-medium hidden sm:block">
+              <span className="text-[10px] text-gray-500 font-medium hidden sm:block">
                 Premium Marketplace
               </span>
             </div>
           </Link>
 
-          {/* Search Bar - Perfectly Compact */}
-          <div className="flex-1 min-w-0 mx-1 sm:mx-2">
-            <SearchBar />
-          </div>
+          {/* Actions (Desktop & Mobile) */}
+          <div className="flex items-center gap-2">
 
-          {/* Desktop/Tablet Navigation & Actions */}
-          <div className="hidden md:flex items-center gap-1 flex-shrink-0">
-            <CategoriesDropdown />
-            {user ? (
-              <UserActions
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-2">
+              {user ? (
+                <UserActions
+                  user={user}
+                  unreadCounts={unreadCounts}
+                  isLoading={isLoading}
+                  onRefreshCounts={refreshCounts}
+                  onSignOut={handleSignOut}
+                />
+              ) : (
+                <GuestActions />
+              )}
+            </div>
+
+            {/* Mobile Actions */}
+            <div className="flex md:hidden items-center gap-1.5">
+              {user && (
+                <CompactUserActions
+                  user={user}
+                  unreadCounts={unreadCounts}
+                  onSignOut={handleSignOut}
+                />
+              )}
+              {!user && (
+                <Link to="/signin">
+                  <Button variant="outline" size="sm" className="h-8 text-xs px-3 border-green-600 text-green-600">
+                    Sign In
+                  </Button>
+                </Link>
+              )}
+              {!user && (
+                <Link to="/cart">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 relative text-gray-600 hover:text-green-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    {cartCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] text-white bg-green-600 border border-white">
+                        {cartCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+              )}
+              <MobileMenu
+                isOpen={isMobileMenuOpen}
+                onOpenChange={setIsMobileMenuOpen}
                 user={user}
                 unreadCounts={unreadCounts}
                 isLoading={isLoading}
                 onRefreshCounts={refreshCounts}
                 onSignOut={handleSignOut}
               />
-            ) : (
-              <GuestActions />
-            )}
-          </div>
-
-          {/* Mobile Actions - Improved Touch Targets */}
-          <div className="flex md:hidden items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            {user && (
-              <>
-                <Link to="/products/upload">
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-2.5 h-9 sm:h-10 rounded-lg text-xs font-medium transition-colors shadow-sm"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <CompactUserActions
-                  user={user}
-                  unreadCounts={unreadCounts}
-                  onSignOut={handleSignOut}
-                />
-              </>
-            )}
-            {!user && (
-              <div className="flex items-center gap-1.5">
-                <Link to="/signin">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-green-600 text-green-600 hover:bg-green-50 text-xs h-9 sm:h-10 px-3 sm:px-4 transition-colors"
-                  >
-                    Sign In
-                  </Button>
-                </Link>
-              </div>
-            )}
-            <MobileMenu
-              isOpen={isMobileMenuOpen}
-              onOpenChange={setIsMobileMenuOpen}
-              user={user}
-              unreadCounts={unreadCounts}
-              isLoading={isLoading}
-              onRefreshCounts={refreshCounts}
-              onSignOut={handleSignOut}
-            />
+            </div>
           </div>
         </div>
 
-        {/* Secondary Navigation */}
-        <div className="hidden md:flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-          <NavigationLinks />
-          <div className="flex items-center gap-2 text-xs text-gray-600 flex-shrink-0">
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5 text-green-600" />
-              Nairobi
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <CreditCard className="h-3.5 w-3.5 text-green-600" />
-              Multiple Payments
-            </span>
+        {/* ROW 2: Navigation / Titles (Scrollable on mobile) */}
+        <div className="mb-3 overflow-x-auto -mx-3 px-3 scrollbar-hide">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-max">
+            <CategoriesDropdown />
+            <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
+            <NavigationLinks />
+
+            <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
+            {/* Location/Info Badge */}
+            <div className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
+              <MapPin className="h-3 w-3 text-green-600" />
+              <span>Nairobi</span>
+            </div>
           </div>
         </div>
+
+        {/* ROW 3: Search Bar (Full Width) */}
+        <div className="w-full">
+          <SearchBar />
+        </div>
+
       </div>
     </header>
   );

@@ -7,7 +7,7 @@ export default function PrivacyPolicy() {
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="text-center mb-8">
           <Badge className="mb-4 bg-green-100 text-green-700 border-0">
-            Last Updated: January 15, 2025
+            Last Updated: January 20, 2025
           </Badge>
           <h1 className="text-4xl md:text-5xl font-black mb-6 text-gray-900">
             Privacy Policy
@@ -41,18 +41,36 @@ export default function PrivacyPolicy() {
 
               <section className="mb-8">
                 <h2 className="text-2xl font-bold mb-4 text-gray-900">
-                  3. Information Sharing
+                  3. Payment Information
                 </h2>
                 <p className="text-gray-600 mb-4">
-                  We do not sell your personal information to third parties.
-                  Contact information is only shared between users when you
-                  choose to connect with a seller or buyer.
+                  We support multiple payment methods including M-Pesa and SellHub Wallet.
+                </p>
+                <ul className="list-disc list-inside text-gray-600 mb-4 space-y-2">
+                  <li><strong>M-Pesa:</strong> When you make payments via M-Pesa, we process your phone number to initiate STK push requests. Payment confirmation details (transaction ID, receipt number) are stored securely.</li>
+                  <li><strong>Wallet:</strong> Wallet transactions are tracked within our system to manage your balance and history.</li>
+                </ul>
+                <p className="text-gray-600 mb-4">
+                  All payment data is encrypted and processed through secure, industry-standard protocols.
                 </p>
               </section>
 
               <section className="mb-8">
                 <h2 className="text-2xl font-bold mb-4 text-gray-900">
-                  4. Your Rights
+                  4. Information Sharing
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  We do not sell your personal information to third parties.
+                  Contact information is only shared between users when you
+                  choose to connect with a seller or buyer. Payment information
+                  is shared only with our payment processors (Safaricom for M-Pesa)
+                  to complete transactions.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900">
+                  5. Your Rights
                 </h2>
                 <p className="text-gray-600 mb-4">
                   You have the right to access, correct, or delete your personal

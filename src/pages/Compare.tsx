@@ -863,9 +863,9 @@ export default function Compare({ initialProductIds = [] }: CompareProps) {
   return (
     <>
       <SEO
-        title="Compare Prices - KES & Pi Network"
-        description="Compare product prices in KES and Pi Network currency. Find the best deals, analyze value, and check seller ratings on SellHubShop Kenya."
-        keywords="compare prices, price comparison kenya, pi network prices, pi vs kes, best deals kenya, product comparison"
+        title="Compare Prices | Kenya's Premium Marketplace"
+        description="Compare product prices and find the best deals, analyze value, and check seller ratings on SellHub Kenya."
+        keywords="compare prices, price comparison kenya, best deals kenya, product comparison"
       />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50">
         <div className="container mx-auto px-4 py-8">
