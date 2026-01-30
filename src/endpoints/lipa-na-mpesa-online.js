@@ -346,7 +346,12 @@ router.post('/callback', async (req, res) => {
                         if (processError) {
                             console.error('[M-Pesa] Error processing wallet deposit:', processError);
                         } else {
-                            console.log('[M-Pesa] Wallet Deposit Processed Successfully!');
+                            console.log('[M-Pesa] Wallet Deposit RPC Result:', processResult);
+                            if (processResult && processResult.success) {
+                                console.log('[M-Pesa] Wallet Deposit Processed Successfully!');
+                            } else {
+                                console.error('[M-Pesa] Wallet Deposit Failed Logic:', processResult);
+                            }
                         }
                     } else {
                         console.warn(`[M-Pesa] No Subscription, Order, OR Wallet Deposit found for CheckoutRequestID: ${CheckoutRequestID}`);
