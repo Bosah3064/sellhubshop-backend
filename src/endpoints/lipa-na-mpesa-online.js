@@ -302,21 +302,13 @@ router.post('/callback', async (req, res) => {
                     // --- WALLET DEPOSIT LOGIC ---
                     console.log('[M-Pesa] Not an order. Checking Wallet Deposits...');
                     
-                    // Extract AccountReference from callback metadata
-                    let accountRef = null;
-                    if (CallbackMetadata && CallbackMetadata.Item) {
-                        // AccountReference is not in metadata, we need to get it from the original request
-                        // But we can search by CheckoutRequestID in our pending transactions
-                    }
-                    
                     // Check for wallet deposit transaction by CheckoutRequestID stored in mpesa_receipt
-                    // OR by reference_id if we stored the shortRef there
                     const { data: depositTx, error: depositError } = await supabase
                         .from('wallet_transactions')
                         .select('id, wallet_id, amount, reference_id')
+                        .eq('mpesa_receipt', CheckoutRequestID)
                         .eq('status', 'pending')
                         .eq('reference_type', 'deposit')
-                        .or(`mpesa_receipt.eq.${CheckoutRequestID}`)
                         .maybeSingle();
 
                     if (depositTx) {
