@@ -19,8 +19,8 @@ const {
 const VALID_CALLBACK_URL = SAFARICOM_CALLBACK_URL || CALLBACK_URL || process.env.DEV_CALLBACK_URL || "https://sellhubshop-backend.onrender.com/api/v1/callback";
 
 router.post('/', async (req, res) => {
-    // ... (existing STK push logic remains unchanged) ...
-    const { amount, phone, phoneNumber } = req.body;
+    // Extract walletTransactionId and orderId from the request body
+    const { amount, phone, phoneNumber, walletTransactionId, orderId } = req.body;
     let actualPhone = phone || phoneNumber;
 
     // Validate and format phone number (254...)
@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
         }
     }
 
-    console.log('[M-Pesa] STK Push Request:', { amount, phone: actualPhone });
+    console.log('[M-Pesa] STK Push Request:', { amount, phone: actualPhone, walletTransactionId, orderId });
 
     if (!actualPhone || !amount) {
         return res.status(400).json({ error: 'Phone number and amount are required' });
@@ -92,6 +92,29 @@ router.post('/', async (req, res) => {
 
         const response = await requestHelper.postRequest(url, stkData, token);
         console.log('[M-Pesa] Safaricom Response:', response.data);
+
+        // --- CRITICAL FIX: Save CheckoutRequestID IMMEDIATELY ---
+        if (response.data && response.data.ResponseCode === "0") {
+            const checkoutRequestID = response.data.CheckoutRequestID;
+
+            if (walletTransactionId) {
+                console.log(`[M-Pesa] Linking CheckoutRequestID ${checkoutRequestID} to Wallet Transaction ${walletTransactionId}`);
+                await supabase
+                    .from('wallet_transactions')
+                    .update({ mpesa_receipt: checkoutRequestID })
+                    .eq('id', walletTransactionId);
+            }
+
+            if (orderId) {
+                console.log(`[M-Pesa] Linking CheckoutRequestID ${checkoutRequestID} to Order ${orderId}`);
+                await supabase
+                    .from('marketplace_orders')
+                    .update({ transaction_id: checkoutRequestID })
+                    .eq('id', orderId);
+            }
+        }
+        // -------------------------------------------------------
+
         res.json(response.data);
     } catch (err) {
         console.error('[M-Pesa] Error:', err.message);
