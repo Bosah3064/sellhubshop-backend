@@ -16,6 +16,7 @@ const oauth = require('./endpoints/oauth');
 const reversal = require('./endpoints/reversal');
 const txnStatus = require('./endpoints/transaction-status');
 const c2bCallback = require('./endpoints/c2b-callback');
+const b2cCallback = require('./endpoints/b2c-callback');
 
 // Routes
 
@@ -27,6 +28,9 @@ router.use('/b2b', authMiddleware, b2b);
 
 // C2B Public Callbacks (MUST be public)
 router.use('/v1/c2b', c2bCallback);
+
+// B2C Public Callbacks (MUST be public for Safaricom)
+router.use('/v1/callback/b2c', b2cCallback);
 
 // STK Push Initiation (Authenticated) & Callback (Public - inside the module)
 // Note: lipa-na-mpesa-online.js handles its own routing. 
@@ -47,6 +51,7 @@ router.use('/v1/query', authMiddleware, lipaQuery); // Alias
 router.use('/oauth', oauth); // OAuth might be internal/public depending on use case
 router.use('/reversal', authMiddleware, reversal);
 router.use('/transaction-status', authMiddleware, txnStatus);
+
 
 
 module.exports = router;
