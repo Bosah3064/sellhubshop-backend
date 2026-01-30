@@ -1,4 +1,6 @@
 -- Function to process wallet deposit from M-Pesa callback
+DROP FUNCTION IF EXISTS process_wallet_deposit(UUID, TEXT);
+
 CREATE OR REPLACE FUNCTION process_wallet_deposit(
     p_transaction_id UUID,
     p_mpesa_receipt TEXT
