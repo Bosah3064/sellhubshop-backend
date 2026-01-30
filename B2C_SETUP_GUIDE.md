@@ -25,10 +25,20 @@ Visit: https://developer.safaricom.co.ke/
 
 ### 1.3 Get Initiator Name
 
-The Initiator Name is your API operator username. Contact Safaricom support to
-get this.
+**You must create this user on the M-Pesa Organization Portal.**
 
-Example: `testapi` (sandbox) or your actual username (production)
+1. Log in to the **M-Pesa Organization Portal**:
+   [https://org.ke.m-pesa.com/](https://org.ke.m-pesa.com/)
+2. Go to **Operator Management** -> **Create Operator**.
+3. Fill in the details for a new user.
+4. **Crucial**: Assign the role that allows B2C transactions (often called
+   "Business Manager", "API Operator", or ensure they have "Business to
+   Customer" permissions).
+5. The **Username** you set here = Your `MPESA_B2C_INITIATOR_NAME`.
+6. The **Password** you set here = The password you must encrypt to get the
+   `MPESA_B2C_SECURITY_CREDENTIAL`.
+
+_Note: This is DIFFERENT from your Developer Portal login._
 
 ### 1.4 Generate Security Credential
 
@@ -166,11 +176,11 @@ Content-Type: application/json
 
 ```json
 {
-    "success": true,
-    "message": "Withdrawal initiated successfully",
-    "transactionId": "transaction-uuid",
-    "conversationId": "AG_20240130_...",
-    "amount": 100,
-    "phone": "254712345678"
+  "success": true,
+  "message": "Withdrawal initiated successfully",
+  "transactionId": "transaction-uuid",
+  "conversationId": "AG_20240130_...",
+  "amount": 100,
+  "phone": "254712345678"
 }
 ```

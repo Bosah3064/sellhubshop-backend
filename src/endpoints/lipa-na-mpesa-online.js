@@ -16,7 +16,7 @@ const {
     MPESA_TILL_NUMBER
 } = process.env;
 
-const VALID_CALLBACK_URL = SAFARICOM_CALLBACK_URL || CALLBACK_URL || process.env.DEV_CALLBACK_URL || "https://sellhubshop-backend.onrender.com/api/mpesa/callback";
+const VALID_CALLBACK_URL = SAFARICOM_CALLBACK_URL || CALLBACK_URL || process.env.DEV_CALLBACK_URL || "https://sellhubshop-backend.onrender.com/api/v1/callback";
 
 router.post('/', async (req, res) => {
     // ... (existing STK push logic remains unchanged) ...
