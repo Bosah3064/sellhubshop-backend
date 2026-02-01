@@ -29,6 +29,10 @@ app.use('/api/email', emailRoutes);
 const shareRoutes = require('./endpoints/share');
 app.use('/api/share', shareRoutes);
 
+// Notifications endpoint
+const notificationsRoutes = require('./endpoints/notifications');
+app.use('/api/notifications', notificationsRoutes);
+
 // Admin Management endpoint
 const adminRoutes = require('./endpoints/admin');
 app.use('/api/admin', adminRoutes);

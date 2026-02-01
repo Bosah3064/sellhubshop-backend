@@ -115,7 +115,9 @@ router.post('/', async (req, res) => {
         }
 
         // 5. Get M-Pesa access token
+        console.log('[B2C] Requesting Access Token...');
         const token = await helpers.getAccessToken(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_ENV);
+        console.log('[B2C] Access Token Received.');
 
         // 6. Prepare B2C request
         const b2cCallbackUrl = `${CALLBACK_URL}/b2c/result` || 'https://sellhubshop-backend.onrender.com/api/v1/callback/b2c/result';
@@ -179,6 +181,15 @@ router.post('/', async (req, res) => {
         console.error('[B2C] Error:', err.message);
         if (err.response) {
             console.error('[B2C] Safaricom Error:', err.response.data);
+            
+            // Handle "No API Product Match" specifically
+            if (err.response.data && err.response.data.errorCode === "401.002.01") {
+                return res.status(400).json({
+                    error: 'B2C Not Enabled',
+                    details: 'Your Safaricom App does not have "M-Pesa B2C" enabled. Please go to the Safaricom Developer Portal, edit your App, and check "M-Pesa B2C".'
+                });
+            }
+
             return res.status(err.response.status).json({
                 error: 'M-Pesa error',
                 details: err.response.data

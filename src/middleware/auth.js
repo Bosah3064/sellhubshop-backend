@@ -52,9 +52,11 @@ const authMiddleware = async (req, res, next) => {
         }
 
         // 3. Neither admin nor regular user
+        console.log("Auth Failed: Token valid but no user found. AdminErr:", adminError?.message, "UserErr:", userError?.message);
         return res.status(401).json({
-            error: "Invalid or expired session",
-            details: adminError?.message || userError?.message || "Session not found"
+            error: "Authentication failed",
+            details: adminError?.message || userError?.message || "Session not found",
+            debug: "Reach out to support if this persists."
         });
 
     } catch (error) {

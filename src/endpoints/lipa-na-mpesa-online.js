@@ -4,6 +4,7 @@ const helpers = require('../helpers');
 const requestHelper = require('../helpers/request');
 const security = require('../helpers/security');
 const { supabase } = require('../helpers/supabase'); // Import Supabase
+const webpush = require('web-push'); // Import Web Push
 const {
     MPESA_SHORTCODE,
     MPESA_PASSKEY,
@@ -13,14 +14,31 @@ const {
     MPESA_ENV,
     MPESA_CONSUMER_KEY,
     MPESA_CONSUMER_SECRET,
-    MPESA_TILL_NUMBER
+    MPESA_TILL_NUMBER,
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY,
+    VAPID_SUBJECT
 } = process.env;
+
+// Initialize Web Push
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    try {
+        webpush.setVapidDetails(
+            VAPID_SUBJECT || 'mailto:admin@sellhubshop.co.ke',
+            VAPID_PUBLIC_KEY,
+            VAPID_PRIVATE_KEY
+        );
+        console.log('[Web Push] Initialized successfully');
+    } catch (e) {
+        console.error('[Web Push] Init Error:', e.message);
+    }
+}
 
 const VALID_CALLBACK_URL = SAFARICOM_CALLBACK_URL || CALLBACK_URL || process.env.DEV_CALLBACK_URL || "https://sellhubshop-backend.onrender.com/api/v1/callback";
 
 router.post('/', async (req, res) => {
-    // ... (existing STK push logic remains unchanged) ...
-    const { amount, phone, phoneNumber } = req.body;
+    // Extract walletTransactionId and orderId from the request body
+    const { amount, phone, phoneNumber, walletTransactionId, orderId } = req.body;
     let actualPhone = phone || phoneNumber;
 
     // Validate and format phone number (254...)
@@ -33,7 +51,7 @@ router.post('/', async (req, res) => {
         }
     }
 
-    console.log('[M-Pesa] STK Push Request:', { amount, phone: actualPhone });
+    console.log('[M-Pesa] STK Push Request:', { amount, phone: actualPhone, walletTransactionId, orderId });
 
     if (!actualPhone || !amount) {
         return res.status(400).json({ error: 'Phone number and amount are required' });
@@ -92,6 +110,29 @@ router.post('/', async (req, res) => {
 
         const response = await requestHelper.postRequest(url, stkData, token);
         console.log('[M-Pesa] Safaricom Response:', response.data);
+
+        // --- CRITICAL FIX: Save CheckoutRequestID IMMEDIATELY ---
+        if (response.data && response.data.ResponseCode === "0") {
+            const checkoutRequestID = response.data.CheckoutRequestID;
+
+            if (walletTransactionId) {
+                console.log(`[M-Pesa] Linking CheckoutRequestID ${checkoutRequestID} to Wallet Transaction ${walletTransactionId}`);
+                await supabase
+                    .from('wallet_transactions')
+                    .update({ mpesa_receipt: checkoutRequestID })
+                    .eq('id', walletTransactionId);
+            }
+
+            if (orderId) {
+                console.log(`[M-Pesa] Linking CheckoutRequestID ${checkoutRequestID} to Order ${orderId}`);
+                await supabase
+                    .from('marketplace_orders')
+                    .update({ transaction_id: checkoutRequestID })
+                    .eq('id', orderId);
+            }
+        }
+        // -------------------------------------------------------
+
         res.json(response.data);
     } catch (err) {
         console.error('[M-Pesa] Error:', err.message);
@@ -203,8 +244,115 @@ router.post('/callback', async (req, res) => {
                         created_at: new Date().toISOString()
                     });
 
-                    // 4. Referrals (Simplified for brevity, assuming existing logic works)
-                    // ... (Referral logic can remain/be re-inserted here if critical, or kept as is)
+                    // 4. --- REFERRAL REWARD AUTOMATION (SMART CAPPING) ---
+                    try {
+                        console.log('[Referral] Checking for referrer...');
+                        // Find pending referral for this user
+                        const { data: referral } = await supabase
+                            .from('referrals')
+                            .select('*')
+                            .eq('referred_id', subData.user_id)
+                            .eq('status', 'pending') // Only reward once
+                            .maybeSingle();
+
+                        if (referral) {
+                            const referrerId = referral.referrer_id;
+                            console.log(`[Referral] Found referrer: ${referrerId}`);
+
+                            // Check Cap (Max 10 Successful Referrals)
+                            const { count, error: countError } = await supabase
+                                .from('referrals')
+                                .select('*', { count: 'exact', head: true })
+                                .eq('referrer_id', referrerId)
+                                .eq('status', 'completed');
+
+                            if (!countError) {
+                                console.log(`[Referral] Referrer has ${count} completed referrals.`);
+                                
+                                const MAX_REFERRALS = 10;
+                                let rewardAmount = 0;
+                                let newStatus = 'completed';
+                                let notificationMsg = '';
+
+                                // --- EXPIRY LOGIC (24 Hours) ---
+                                const referralDate = new Date(referral.created_at);
+                                const now = new Date();
+                                const hoursDiff = Math.abs(now - referralDate) / 36e5;
+
+                                if (hoursDiff > 24) {
+                                    // EXPIRED
+                                    console.log(`[Referral] Referral is ${hoursDiff.toFixed(2)} hours old. EXPIRED.`);
+                                    newStatus = 'expired';
+                                    rewardAmount = 0;
+                                    notificationMsg = `Referral Expired: User subscribed after 24 hours. No reward.`;
+                                } else if (count < MAX_REFERRALS) {
+                                    // REWARD ELIGIBLE
+                                    // REWARD ELIGIBLE
+                                    rewardAmount = 50; // Standard Reward (Can be dynamic based on plan)
+                                    if (planName === 'gold') rewardAmount = 100; // Higher reward for gold
+
+                                    notificationMsg = `You earned KES ${rewardAmount} for a new referral! Added to your Wallet.`;
+                                    
+                                    // Credit Wallet
+                                    let { data: wallet } = await supabase.from('wallets').select('id').eq('user_id', referrerId).maybeSingle();
+                                    if (!wallet) {
+                                        const { data: newWallet } = await supabase.from('wallets').insert({ user_id: referrerId, balance: 0 }).select('id').single();
+                                        wallet = newWallet;
+                                    }
+
+                                    if (wallet) {
+                                        // Update Balance
+                                        await supabase.rpc('increment_wallet', { p_wallet_id: wallet.id, p_amount: rewardAmount })
+                                            .catch(async () => {
+                                                // Fallback
+                                                const { data: cur } = await supabase.from('wallets').select('balance').eq('id', wallet.id).single();
+                                                await supabase.from('wallets').update({ balance: (cur.balance || 0) + rewardAmount }).eq('id', wallet.id);
+                                            });
+
+                                        // Log Transaction
+                                        await supabase.from('wallet_transactions').insert({
+                                            wallet_id: wallet.id,
+                                            amount: rewardAmount,
+                                            type: 'credit',
+                                            reference_type: 'referral',
+                                            reference_id: referral.id,
+                                            description: `Referral Bonus (${planName})`,
+                                            status: 'completed'
+                                        });
+                                        
+                                        console.log(`[Referral] Credited KES ${rewardAmount} to wallet ${wallet.id}`);
+                                    }
+                                } else {
+                                    // CAP REACHED
+                                    console.log('[Referral] Cap reached (10). No reward.');
+                                    newStatus = 'completed_capped'; // Custom status to indicate success but no money
+                                    notificationMsg = `A friend joined via your link! (Max rewards reached)`;
+                                }
+
+                                // Update Referral Record
+                                await supabase
+                                    .from('referrals')
+                                    .update({
+                                        status: newStatus,
+                                        reward_amount: rewardAmount,
+                                        updated_at: new Date().toISOString()
+                                    })
+                                    .eq('id', referral.id);
+
+                                // Send Notification
+                                await supabase.from('notifications').insert({
+                                    user_id: referrerId,
+                                    title: rewardAmount > 0 ? 'Referral Reward! 🎁' : 'Referral Success! 🎯',
+                                    message: notificationMsg,
+                                    type: 'system',
+                                    is_read: false
+                                });
+                            }
+                        }
+                    } catch (refErr) {
+                        console.error('[Referral] Automation Error:', refErr);
+                    }
+                    // -----------------------------------------------------
                 }
 
             } else {
@@ -291,6 +439,53 @@ router.post('/callback', async (req, res) => {
                                       const { data: currentWallet } = await supabase.from('wallets').select('balance').eq('id', wallet.id).single();
                                       const newBal = (Number(currentWallet.balance) || 0) + Number(item.total_price);
                                       await supabase.from('wallets').update({ balance: newBal }).eq('id', wallet.id);
+
+                                      // --- NOTIFICATION: Tell Seller about the Sale ---
+                                      await supabase.from('notifications').insert({
+                                          user_id: item.seller_id,
+                                          title: 'New Order Received! 💰',
+                                          message: `You sold an item! Order #${orderData.id.substring(0,8)} is paid. Amount: KES ${item.total_price}`,
+                                          type: 'order',
+                                          type: 'order',
+                                          is_read: false
+                                      });
+
+                                      // --- WEB PUSH: Send to Phone ---
+                                      try {
+                                          const { data: subs } = await supabase
+                                              .from('push_subscriptions')
+                                              .select('*')
+                                              .eq('user_id', item.seller_id);
+
+                                          if (subs && subs.length > 0) {
+                                              const payload = JSON.stringify({
+                                                  title: 'New Sale! 💰',
+                                                  body: `Order #${orderData.id.substring(0,8)} paid. KES ${item.total_price}`,
+                                                  url: '/dashboard'
+                                              });
+                                              console.log(`[Web Push] Sending to ${subs.length} devices for user ${item.seller_id}`);
+                                              
+                                              subs.forEach(sub => {
+                                                  const pushSubscription = {
+                                                      endpoint: sub.endpoint,
+                                                      keys: {
+                                                          p256dh: sub.p256dh,
+                                                          auth: sub.auth
+                                                      }
+                                                  };
+                                                  webpush.sendNotification(pushSubscription, payload)
+                                                      .catch(err => {
+                                                          console.error('[Web Push] Send Error:', err.statusCode);
+                                                          if (err.statusCode === 410 || err.statusCode === 404) {
+                                                              // Subscription expired, remove from DB
+                                                              supabase.from('push_subscriptions').delete().eq('id', sub.id).then();
+                                                          }
+                                                      });
+                                              });
+                                          }
+                                      } catch (pushErr) {
+                                          console.error('[Web Push] Logic Error:', pushErr);
+                                      }
                                  }
                              }
                          }
