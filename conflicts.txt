@@ -1,0 +1,34 @@
+
+UU node_modules/.package-lock.json
+UU package-lock.json
+UU package.json
+DU public/manifest.json
+DU public/robots.txt
+DU public/sitemap.xml
+DU public/sw.js
+DU src/App.tsx
+DU src/components/Header.tsx
+DU src/components/PriceDisplay.tsx
+DU src/components/WithdrawalModal.tsx
+DU src/index.css
+DU src/lib/security.ts
+DU src/lib/session-manager.ts
+DU src/middleware/AdminSecurity.tsx
+DU src/pages/About.tsx
+DU src/pages/AdminBannerManager.tsx
+DU src/pages/AdminDashboard.tsx
+DU src/pages/Checkout.tsx
+DU src/pages/Contact.tsx
+DU src/pages/Dashboard.tsx
+DU src/pages/HelpCenter.tsx
+DU src/pages/Index.tsx
+DU src/pages/Marketplace.tsx
+DU src/pages/Pricing.tsx
+DU src/pages/ProductDetail.tsx
+DU src/pages/Referrals.tsx
+DU src/pages/Settings.tsx
+DU src/pages/Wallet.tsx
+DU src/providers/AuthProvider.tsx
+DU supabase/migrations/20260130_fix_process_wallet_deposit.sql
+DU tailwind.config.ts
+

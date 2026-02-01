@@ -1,0 +1,82 @@
+/* Print-specific styles for Statement Generator */
+@media print {
+  /* Set page size */
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+  
+  /* Hide EVERYTHING on the page */
+  body > * {
+    display: none !important;
+  }
+  
+  /* Hide all dialogs and their overlays */
+  [role="dialog"],
+  [role="presentation"],
+  .fixed,
+  .absolute {
+    display: none !important;
+  }
+  
+  /* Show ONLY the statement content */
+  #statement-content {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-after: auto !important;
+  }
+  
+  /* Make statement content visible by forcing its parent chain */
+  #statement-content,
+  #statement-content * {
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  /* Preserve colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Remove shadows for print */
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl,
+  .shadow-md,
+  .shadow-sm {
+    box-shadow: none !important;
+  }
+  
+  /* Ensure tables print properly */
+  table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  tr {
+    display: table-row !important;
+  }
+  
+  td, th {
+    display: table-cell !important;
+  }
+  
+  /* Prevent page breaks */
+  h1, h2, h3,
+  table {
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+}
+
+
+
+
