@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WithdrawalModalProps {
   open: boolean;
@@ -77,11 +78,25 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     setStep('processing');
 
     try {
+      // Get Supabase session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      console.log('[Withdrawal] Session:', session ? 'Found' : 'Not found');
+      console.log('[Withdrawal] User ID from session:', session?.user?.id);
+      console.log('[Withdrawal] User ID from props:', userId);
+      
+      if (!session) {
+        throw new Error('You must be logged in to withdraw');
+      }
+
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://sellhubshop-backend.onrender.com';
+      console.log('[Withdrawal] Calling:', `${backendUrl}/api/b2c`);
+      
       const response = await fetch(`${backendUrl}/api/b2c`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`, // Add auth token
         },
         body: JSON.stringify({
           amount: withdrawalAmount,
@@ -91,6 +106,8 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
       });
 
       const data = await response.json();
+      console.log('[Withdrawal] Response status:', response.status);
+      console.log('[Withdrawal] Response data:', data);
 
       if (response.ok && data.success) {
         toast({
@@ -101,7 +118,8 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
         onSuccess();
         handleClose();
       } else {
-        throw new Error(data.error || 'Withdrawal failed');
+        const detailMsg = data.details ? (typeof data.details === 'string' ? data.details : JSON.stringify(data.details)) : '';
+        throw new Error((data.error || 'Withdrawal failed') + (detailMsg ? `: ${detailMsg}` : ''));
       }
     } catch (error: any) {
       console.error('Withdrawal error:', error);

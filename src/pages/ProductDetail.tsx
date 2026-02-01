@@ -94,7 +94,8 @@ interface Review {
   reviewer?: {
     id: string;
     full_name: string;
-    profile_image?: string;
+    profile_image?: string; // KEEPING for backward compatibility if needed, but we should map or use avatar_url
+    avatar_url?: string;
     username?: string;
   };
 }
@@ -103,7 +104,7 @@ interface UserProfile {
   id: string;
   username: string;
   full_name: string;
-  profile_image?: string;
+  avatar_url?: string | null; // Changed from profile_image
   phone: string;
   whatsapp: string;
   location: string;
@@ -112,6 +113,7 @@ interface UserProfile {
   followers_count: number;
   following_count: number;
   bio?: string;
+  updated_at?: string | null;
 }
 
 export default function ProductDetail() {
@@ -131,6 +133,24 @@ export default function ProductDetail() {
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [copied, setCopied] = useState(false);
   const { addToCart } = useCart();
+  
+  // Helper to check online status (active within 10 minutes)
+  const isUserOnline = (updatedAt: string | null | undefined) => {
+    if (!updatedAt) return false;
+    const diffInMinutes = (new Date().getTime() - new Date(updatedAt).getTime()) / 60000;
+    return diffInMinutes < 10;
+  };
+
+  const getLastSeenText = (updatedAt: string | null | undefined) => {
+    if (!updatedAt) return "Offline";
+    const diffInMinutes = Math.floor((new Date().getTime() - new Date(updatedAt).getTime()) / 60000);
+    
+    if (diffInMinutes < 1) return "Online now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
 
   useEffect(() => {
     initializeUser();
@@ -338,7 +358,7 @@ export default function ProductDetail() {
       const reviewerIds = reviewsData.map((review) => review.reviewer_id);
       const { data: reviewerProfiles } = await supabase
         .from("profiles")
-        .select("id, full_name, profile_image, username")
+        .select("id, full_name, avatar_url, username")
         .in("id", reviewerIds);
 
       const reviewsWithProfiles = reviewsData.map((review) => ({
@@ -655,32 +675,14 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
   return (
     <div className="min-h-screen bg-background">
       {/* Meta Tags for Social Media Sharing */}
-      <Helmet>
-        <title>{metaTags.title}</title>
-        <meta name="description" content={metaTags.description} />
-        <meta property="og:type" content="product" />
-        <meta property="og:url" content={metaTags.url} />
-        <meta property="og:title" content={metaTags.productName} />
-        <meta property="og:description" content={metaTags.description} />
-        <meta property="og:image" content={metaTags.image} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:site_name" content="MarketHub" />
-        <meta property="og:locale" content="en_US" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@Markethub" />
-        <meta name="twitter:title" content={metaTags.productName} />
-        <meta name="twitter:description" content={metaTags.description} />
-        <meta name="twitter:image" content={metaTags.image} />
-        <meta name="twitter:creator" content="@Markethub" />
-        <meta property="product:price:amount" content={metaTags.price?.toString()} />
-        <meta property="product:price:currency" content={metaTags.currency} />
-        <meta property="product:condition" content={metaTags.condition} />
-        <meta property="product:brand" content={metaTags.sellerName} />
-        <meta property="product:availability" content="in stock" />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href={metaTags.url} />
-      </Helmet>
+      <SEO
+        title={metaTags.title}
+        description={metaTags.description}
+        image={metaTags.image}
+        url={metaTags.url}
+        type="product"
+        keywords={`${product.category}, ${product.subcategory}, ${product.name}, buy ${product.name} kenya, ${product.name} price`}
+      />
 
       {/* Navigation */}
       <div className="border-b">
@@ -902,12 +904,15 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
               <>
                 <Card className="p-4">
                   <div className="flex items-start gap-4">
-                    <Avatar className="w-16 h-16 cursor-pointer" onClick={handleViewSellerProfile}>
-                      <AvatarImage src={sellerProfile.profile_image} />
-                      <AvatarFallback className="text-lg">
-                        {sellerProfile.full_name?.charAt(0) || sellerProfile.username?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className="w-16 h-16 cursor-pointer border border-gray-100" onClick={handleViewSellerProfile}>
+                        <AvatarImage src={sellerProfile.avatar_url || undefined} />
+                        <AvatarFallback className="text-lg">
+                          {sellerProfile.full_name?.charAt(0) || sellerProfile.username?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className={`absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full border-2 border-white ${isUserOnline(sellerProfile.updated_at) ? "bg-green-500" : "bg-gray-300"}`}></span>
+                    </div>
 
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-3">
@@ -915,10 +920,17 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
                           <h3 className="font-semibold text-lg cursor-pointer hover:text-green-600 transition-colors" onClick={handleViewSellerProfile}>
                             {sellerProfile.full_name || sellerProfile.username}
                           </h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <MapPin className="h-3 w-3" />
                             {sellerProfile.location}
                           </div>
+                            <p className="text-xs text-muted-foreground">
+                            {isUserOnline(sellerProfile.updated_at) ? (
+                              <span className="text-green-600 font-medium">Online Now</span>
+                            ) : (
+                              <span>Active {getLastSeenText(sellerProfile.updated_at)}</span>
+                            )}
+                          </p>
                         </div>
 
                         <div className="flex gap-2">

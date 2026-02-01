@@ -65,6 +65,7 @@ import {
 import { BannerCarousel } from "@/pages/BannerCarousel";
 import { useCart } from "@/hooks/useCart";
 import { Wallet } from "lucide-react";
+import { DarkModeToggle } from "./ui/dark-mode-toggle";
 
 // Types
 interface UnreadCounts {
@@ -414,10 +415,12 @@ const CompactUserActions = ({
   user,
   unreadCounts,
   onSignOut,
+  avatarUrl,
 }: {
   user: User;
   unreadCounts: UnreadCounts;
   onSignOut: () => void;
+  avatarUrl?: string | null;
 }) => {
   const navigate = useNavigate();
   const { getItemCount } = useCart();
@@ -464,6 +467,7 @@ const CompactUserActions = ({
             )}
           </Button>
         </Link>
+        <DarkModeToggle />
       </div>
 
       {/* User Dropdown - Better Touch Target */}
@@ -473,8 +477,12 @@ const CompactUserActions = ({
             variant="ghost"
             className="flex items-center p-1 hover:bg-green-50 rounded-lg transition-colors duration-200 border border-transparent hover:border-green-200 h-9 sm:h-10"
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-md flex items-center justify-center">
-              <UserIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center overflow-hidden ${avatarUrl ? '' : 'bg-gradient-to-r from-green-500 to-green-600'}`}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+              )}
             </div>
           </Button>
         </DropdownMenuTrigger>
@@ -589,12 +597,14 @@ const UserActions = ({
   isLoading,
   onRefreshCounts,
   onSignOut,
+  avatarUrl,
 }: {
   user: User;
   unreadCounts: UnreadCounts;
   isLoading: boolean;
   onRefreshCounts: () => void;
   onSignOut: () => void;
+  avatarUrl?: string | null;
 }) => {
   const navigate = useNavigate();
   const { getItemCount } = useCart();
@@ -674,6 +684,7 @@ const UserActions = ({
             );
           }
         })}
+        <DarkModeToggle />
       </div>
 
       {/* List Item Button */}
@@ -691,8 +702,12 @@ const UserActions = ({
             variant="ghost"
             className="flex items-center gap-1 p-1 hover:bg-green-50 rounded-lg transition-colors duration-200 border border-transparent hover:border-green-200"
           >
-            <div className="w-7 h-7 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-              <UserIcon className="h-3.5 w-3.5 text-white" />
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden ${avatarUrl ? '' : 'bg-gradient-to-r from-green-500 to-green-600'}`}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                 <UserIcon className="h-3.5 w-3.5 text-white" />
+              )}
             </div>
             <div className="hidden lg:flex flex-col items-start">
               <span className="text-xs font-medium text-gray-800 max-w-20 truncate">
@@ -866,6 +881,7 @@ const GuestActions = () => {
         Get Started
       </Button>
     </Link>
+      <DarkModeToggle />
     </div>
   );
 };
@@ -919,6 +935,7 @@ const MobileMenu = ({
   isLoading,
   onRefreshCounts,
   onSignOut,
+  avatarUrl,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -927,6 +944,7 @@ const MobileMenu = ({
   isLoading: boolean;
   onRefreshCounts: () => void;
   onSignOut: () => void;
+  avatarUrl?: string | null;
 }) => {
   const navigate = useNavigate();
   const handleLinkClick = () => onOpenChange(false);
@@ -1008,8 +1026,12 @@ const MobileMenu = ({
             {user ? (
               <div className="px-3 space-y-2">
                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                    <UserIcon className="h-4 w-4 text-white" />
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${avatarUrl ? '' : 'bg-gradient-to-r from-green-500 to-green-600'}`}>
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="h-4 w-4 text-white" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-800 truncate">
@@ -1154,6 +1176,7 @@ const TrustIndicators = memo(() => (
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -1196,6 +1219,26 @@ export default function Header() {
 
     return () => subscription.unsubscribe();
   }, [initializeUser]);
+
+  useEffect(() => {
+    async function getProfile() {
+      if (!user) {
+        setAvatarUrl(null);
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("id", user.id)
+          .single();
+        if (data) setAvatarUrl(data.avatar_url);
+      } catch (error) {
+        console.error("Error loading avatar:", error);
+      }
+    }
+    getProfile();
+  }, [user]);
 
   return (
     <header className="bg-white/95 backdrop-blur-lg sticky top-0 z-50 shadow-sm border-b border-gray-100">
@@ -1241,6 +1284,7 @@ export default function Header() {
                   isLoading={isLoading}
                   onRefreshCounts={refreshCounts}
                   onSignOut={handleSignOut}
+                  avatarUrl={avatarUrl}
                 />
               ) : (
                 <GuestActions />
@@ -1254,6 +1298,7 @@ export default function Header() {
                   user={user}
                   unreadCounts={unreadCounts}
                   onSignOut={handleSignOut}
+                  avatarUrl={avatarUrl}
                 />
               )}
               {!user && (
@@ -1287,6 +1332,7 @@ export default function Header() {
                 isLoading={isLoading}
                 onRefreshCounts={refreshCounts}
                 onSignOut={handleSignOut}
+                avatarUrl={avatarUrl}
               />
             </div>
           </div>

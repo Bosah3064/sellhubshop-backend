@@ -40,6 +40,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
+    // Heartbeat to update last_seen (updated_at)
+    useEffect(() => {
+        if (!user) return;
+
+        const updateLastSeen = async () => {
+            try {
+                await supabase
+                    .from('profiles')
+                    .update({ updated_at: new Date().toISOString() })
+                    .eq('id', user.id);
+            } catch (error) {
+                console.error("Error updating last seen:", error);
+            }
+        };
+
+        // Update immediately on mount/login
+        updateLastSeen();
+
+        // Update every 2 minutes
+        const interval = setInterval(updateLastSeen, 2 * 60 * 1000);
+
+        return () => clearInterval(interval);
+    }, [user]);
+
     const signOut = async () => {
         await supabase.auth.signOut();
     };

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "react-router-dom";
 import {
   Package,
@@ -26,6 +27,7 @@ import {
   CheckCircle2,
   Sparkles,
   Link as LinkIcon,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +45,8 @@ import {
   Area 
 } from 'recharts';
 import { format, subDays } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MarketInsights } from "@/components/seller/MarketInsights";
 
 interface DashboardStats {
   totalProducts: number;
@@ -98,6 +102,8 @@ const useDashboardData = () => {
   const [plan, setPlan] = useState<UserPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [username, setUsername] = useState<string | null>(null);
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [recentViewers, setRecentViewers] = useState<any[]>([]); // New State for "Who Viewed"
   const { toast } = useToast();
 
   const loadDashboardData = useCallback(async () => {
@@ -256,6 +262,74 @@ const useDashboardData = () => {
           console.log("❌ Error loading revenue data:", error);
         }
       }, 100);
+
+      // ---------------------------------------------------------
+      // 📊 Load Real Chart Data & "Who Viewed"
+      // ---------------------------------------------------------
+      const productIds = userProducts.map((p) => p.id);
+      
+      if (productIds.length > 0) {
+        // A. Fetch Views History (Last 7 Days) for Chart
+        const { data: viewsData } = await supabase
+          .from("product_views")
+          .select("created_at")
+          .in("product_id", productIds)
+          .gte("created_at", subDays(new Date(), 7).toISOString());
+
+        // Process Views into Chart Data
+        const chartMap = new Map<string, number>();
+        // Initialize last 7 days with 0
+        for (let i = 6; i >= 0; i--) {
+          const dateStr = format(subDays(new Date(), i), "MMM dd");
+          chartMap.set(dateStr, 0);
+        }
+
+        if (viewsData) {
+          viewsData.forEach((view) => {
+            const dateStr = format(new Date(view.created_at), "MMM dd");
+            if (chartMap.has(dateStr)) {
+              chartMap.set(dateStr, (chartMap.get(dateStr) || 0) + 1);
+            }
+          });
+        }
+
+        const realChartData = Array.from(chartMap.entries()).map(([date, views]) => ({
+          date,
+          views,
+        }));
+        setPerformanceData(realChartData);
+
+        // B. Fetch Recent Unique Viewers ("Who Viewed")
+        // Note: product_views might not have user_id if anonymous, so we filter where user_id is not null
+        // We need to fetch views with user_id, then get unique user profiles
+        const { data: viewerIdsData } = await supabase
+           .from("product_views")
+           .select("user_id, created_at")
+           .in("product_id", productIds)
+           .not("user_id", "is", null) 
+           .order("created_at", { ascending: false })
+           .limit(20);
+
+        if (viewerIdsData && viewerIdsData.length > 0) {
+           const uniqueViewerIds = [...new Set(viewerIdsData.map(v => v.user_id))].slice(0, 5);
+           
+           if (uniqueViewerIds.length > 0) {
+              const { data: profiles } = await supabase
+                .from("profiles")
+                .select("id, full_name, avatar_url, username")
+                .in("id", uniqueViewerIds);
+                
+              setRecentViewers(profiles || []);
+           }
+        }
+      } else {
+        // No products = No views
+         const emptyChart = Array.from({ length: 7 }).map((_, i) => ({
+            date: format(subDays(new Date(), 6 - i), 'MMM dd'),
+            views: 0
+         }));
+         setPerformanceData(emptyChart);
+      }
     } catch (error: any) {
       console.error("❌ Error loading dashboard data:", error);
       toast({
@@ -268,20 +342,15 @@ const useDashboardData = () => {
     }
   }, [toast]);
 
-  // Generate mock performance data for the chart
-  const performanceData = Array.from({ length: 7 }).map((_, i) => {
-    const date = subDays(new Date(), 6 - i);
-    return {
-      date: format(date, 'MMM dd'),
-      views: Math.floor(Math.random() * 50) + (stats.totalViews / 10),
-      contacts: Math.floor(Math.random() * 10) + (stats.totalMessages / 5),
-    };
-  });
+  // Removed Mock Data Generation
+  // const performanceData = ... (replaced by state)
 
   return {
     products,
     stats,
-    performanceData,
+    stats,
+    performanceData, // Now returns real data state
+    recentViewers, // Export new state
     plan,
     username,
     setUsername,
@@ -291,7 +360,7 @@ const useDashboardData = () => {
 };
 
 export default function Dashboard() {
-  const { products, stats, performanceData, plan, username, isLoading, loadDashboardData } =
+  const { products, stats, performanceData, recentViewers, plan, username, isLoading, loadDashboardData } =
     useDashboardData();
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
@@ -515,420 +584,456 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Performance Analytics Section */}
-      <section className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Chart */}
-          <Card className="lg:col-span-2 overflow-hidden border-2 border-gray-100 shadow-xl rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-8">
-              <div>
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                  Product Views Trend
+      {/* Dashboard Tabs */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="market-insights" className="gap-2">
+            Market Insights <Sparkles className="h-3 w-3 text-amber-500" />
+          </TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: OVERVIEW */}
+        <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          
+          {/* Stats Grid */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-blue-500 rounded-2xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Products
                 </CardTitle>
-                <CardDescription>Visual tracker for your listing reach</CardDescription>
-              </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-700">7-Day Trend</Badge>
-            </CardHeader>
-            <CardContent className="h-[300px] pr-8">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={performanceData}>
-                  <defs>
-                    <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#16a34a" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }} 
-                    dy={10}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="views" 
-                    stroke="#16a34a" 
-                    strokeWidth={4}
-                    fillOpacity={1} 
-                    fill="url(#colorViews)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Smart Insights Sidebar */}
-          <Card className="border-2 border-gray-100 shadow-xl bg-gradient-to-br from-white to-gray-50 rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-amber-500" />
-                Smart Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:border-green-200 transition-all">
-                <p className="text-sm font-bold text-gray-900 mb-1">Price Suggestion</p>
-                <p className="text-xs text-gray-600 mb-2 leading-relaxed">Lowering your price by KES 500 could boost visibility by 35% based on similar sales.</p>
-                <Button variant="outline" size="sm" className="w-full text-xs h-8 rounded-lg group-hover:bg-green-50 transition-colors">Apply Tip</Button>
-              </div>
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:border-green-200 transition-all">
-                <p className="text-sm font-bold text-gray-900 mb-1">Best Posting Time</p>
-                <p className="text-xs text-gray-600 mb-2 leading-relaxed">Your listings perform best on weekends. Schedule your next upload for Saturday morning.</p>
-                <Button variant="outline" size="sm" className="w-full text-xs h-8 rounded-lg group-hover:bg-green-50 transition-colors">Setup Schedule</Button>
-              </div>
-              <div className="bg-green-600 p-4 rounded-xl shadow-lg border-0 text-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <Star className="h-4 w-4 fill-white animate-pulse" />
-                  <p className="text-sm font-bold">Gold Seller Access</p>
-                </div>
-                <p className="text-[10px] opacity-90 leading-tight">Upgrade to Gold for detailed buyer demographics and unlimited listings.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Plan Status Card */}
-      <Card className="mb-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Star className="h-5 w-5 text-primary" />
-            Current Plan: {plan?.plans?.name || "Free"}
-          </CardTitle>
-          <CardDescription className="text-base">
-            Products:{" "}
-            <span className="font-semibold">
-              {stats.totalProducts} / {getProductLimit() === Infinity ? "Unlimited" : getProductLimit()}
-            </span>
-          </CardDescription>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {getPlanFeatures().map((feature, i) => (
-              <Badge key={i} variant="secondary" className="text-[10px] py-0">
-                <CheckCircle2 className="h-2 w-2 mr-1 text-green-500" />
-                {feature}
-              </Badge>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!canAddMoreProducts && getProductLimit() !== Infinity ? (
-            <div className="flex items-center gap-4">
-              <Badge variant="destructive" className="text-sm">
-                Limit Reached
-              </Badge>
-              <Link to="/pricing">
-                <Button className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90">
-                  Upgrade Plan
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
-                      (stats.totalProducts / getProductLimit()) * 100,
-                      100
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {getProductLimit() - stats.totalProducts} products remaining
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Shop Link Card */}
-      <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <LinkIcon className="h-5 w-5 text-blue-600" />
-            Your Shop Link
-          </CardTitle>
-          <CardDescription>
-            Share this link to let customers view all your products in one place
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            {username ? (
-              <div className="flex-1 w-full flex items-center gap-2 p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
-                <span className="text-gray-500 font-medium">sellhubshop.co.ke/u/</span>
-                <span className="font-bold text-blue-700">{username}</span>
-              </div>
-            ) : (
-              <div className="flex-1 w-full">
-                <p className="text-sm text-yellow-600 mb-2 font-medium">
-                  <AlertCircle className="inline h-4 w-4 mr-1" />
-                  Set a username to create your unique shop link
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalProducts}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-green-500">
+                    {stats.activeProducts} active
+                  </span>
+                  {stats.pendingProducts > 0 && (
+                    <span className="text-yellow-500 ml-2">
+                      {stats.pendingProducts} pending
+                    </span>
+                  )}
                 </p>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Enter username (e.g. janeshop)" 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    id="username-input"
-                  />
-                  <Button 
-                    onClick={async () => {
-                      const input = document.getElementById("username-input") as HTMLInputElement;
-                      const newUsername = input.value.trim();
-                      if (!newUsername) return;
-                      
-                      // Basic validation
-                      if (!/^[a-zA-Z0-9_-]+$/.test(newUsername)) {
-                        toast({ variant: "destructive", title: "Invalid format", description: "Username can only contain letters, numbers, underscores and dashes" });
-                        return;
-                      }
+              </CardContent>
+            </Card>
 
-                      try {
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (!user) return;
-
-                        // Check uniqueness
-                        const { data: existing } = await supabase.from('profiles').select('id').eq('username', newUsername).single();
-                        if (existing) {
-                          toast({ variant: "destructive", title: "Taken", description: "This username is already taken" });
-                          return;
-                        }
-
-                        const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', user.id);
-                        if (error) throw error;
-                        
-                        toast({ title: "Success", description: "Username set successfully!" });
-                        loadDashboardData();
-                      } catch (e: any) {
-                        toast({ variant: "destructive", title: "Error", description: e.message });
-                      }
-                    }}
-                  >
-                    Claim Link
-                  </Button>
+            <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-green-500 rounded-2xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Total Views</CardTitle>
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {stats.totalViews.toLocaleString()}
                 </div>
-              </div>
-            )}
-            
-            {username && (
-               <Button
-                variant="outline"
-                className="w-full md:w-auto"
-                onClick={() => {
-                   const url = `${window.location.origin}/u/${username}`;
-                   navigator.clipboard.writeText(url);
-                   toast({ title: "Copied!", description: "Shop link copied to clipboard" });
-                }}
-               >
-                 <LinkIcon className="h-4 w-4 mr-2" />
-                 Copy Link
-               </Button>
-            )}
-            
-            {username && (
-              <a href={`/u/${username}`} target="_blank" rel="noreferrer" className="w-full md:w-auto">
-                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                   Visit Shop
-                 </Button>
-              </a>
-            )}
+                <p className="text-xs text-muted-foreground">
+                  {stats.totalViews === 0 ? (
+                    <span className="text-orange-500">No views yet</span>
+                  ) : (
+                    "Across all products"
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-purple-500 rounded-2xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <CompactPriceDisplay kesAmount={stats.totalRevenue} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.monthlyRevenue > 0 ? (
+                    <span className="text-green-500">
+                      KES {stats.monthlyRevenue.toLocaleString()} this month
+                    </span>
+                  ) : (
+                    "No revenue yet"
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-orange-500 rounded-2xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Messages</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalMessages}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.totalMessages === 0
+                    ? "No new messages"
+                    : "Unread messages"}
+                </p>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-blue-500 rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Products
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProducts}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-500">
-                {stats.activeProducts} active
-              </span>
-              {stats.pendingProducts > 0 && (
-                <span className="text-yellow-500 ml-2">
-                  {stats.pendingProducts} pending
-                </span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Link to="/products/upload">
+              <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer border-2 border-dashed border-primary/20 hover:border-primary/40">
+                <CardContent className="p-6 text-center">
+                  <Plus className="h-8 w-8 text-primary mx-auto mb-2" />
+                  <p className="font-semibold">Add New Product</p>
+                  <p className="text-sm text-muted-foreground">
+                    {canAddMoreProducts
+                      ? "List a new item for sale"
+                      : "Upgrade to add more products"}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
 
-        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-green-500 rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.totalViews.toLocaleString()}
+            <Link to="/messages">
+              <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+                <CardContent className="p-6 text-center">
+                  <MessageSquare className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                  <p className="font-semibold">View Messages</p>
+                  <p className="text-sm text-muted-foreground">
+                    {stats.totalMessages === 0
+                      ? "No new messages"
+                      : `${stats.totalMessages} unread messages`}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/analytics">
+              <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+                <CardContent className="p-6 text-center">
+                  <TrendingUp className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <p className="font-semibold">View Analytics</p>
+                  <p className="text-sm text-muted-foreground">
+                    Track your sales and performance
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          {/* Performance Analytics Section */}
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main Chart */}
+              <Card className="lg:col-span-2 overflow-hidden border-2 border-gray-100 shadow-xl rounded-2xl">
+                <CardHeader className="flex flex-row items-center justify-between pb-8">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                      Product Views Trend
+                    </CardTitle>
+                    <CardDescription>Visual tracker for your listing reach</CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">7-Day Trend</Badge>
+                </CardHeader>
+                <CardContent className="h-[300px] pr-8">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={performanceData}>
+                      <defs>
+                        <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#16a34a" stopOpacity={0.1}/>
+                          <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                      <XAxis 
+                        dataKey="date" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#9CA3AF', fontSize: 11 }} 
+                        dy={10}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="views" 
+                        stroke="#16a34a" 
+                        strokeWidth={4}
+                        fillOpacity={1} 
+                        fill="url(#colorViews)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Recent Viewers Card */}
+               <Card className="border-2 border-indigo-50 shadow-xl bg-white rounded-2xl overflow-hidden">
+                 <CardHeader className="bg-indigo-50/50 pb-4">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2 text-indigo-900">
+                    <Eye className="h-5 w-5 text-indigo-600" />
+                    Who Viewed Your Products
+                  </CardTitle>
+                 </CardHeader>
+                 <CardContent className="pt-6">
+                    {recentViewers.length > 0 ? (
+                      <div className="space-y-4">
+                        {recentViewers.map((viewer) => (
+                          <div key={viewer.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-colors">
+                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                                <AvatarImage src={viewer.avatar_url} />
+                                <AvatarFallback className="bg-indigo-100 text-indigo-700">
+                                  {viewer.full_name?.charAt(0) || viewer.username?.charAt(0) || "U"}
+                                </AvatarFallback>
+                             </Avatar>
+                             <div>
+                                <p className="text-sm font-bold text-gray-900">{viewer.full_name || viewer.username || "Anonymous User"}</p>
+                                <p className="text-xs text-indigo-600 font-medium">Viewed your listings</p>
+                             </div>
+                          </div>
+                        ))}
+                        {recentViewers.length >= 5 && (
+                            <div className="text-center pt-2">
+                              <Button variant="link" className="text-xs text-indigo-600">View All Activity</Button>
+                            </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-gray-400">
+                         <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                           <Users className="h-6 w-6 text-indigo-300" />
+                         </div>
+                         <p className="text-sm font-medium">No identified viewers yet</p>
+                         <p className="text-xs mt-1">Share your shop link to get more traffic!</p>
+                      </div>
+                    )}
+                 </CardContent>
+               </Card>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalViews === 0 ? (
-                <span className="text-orange-500">No views yet</span>
-              ) : (
-                "Across all products"
-              )}
-            </p>
-          </CardContent>
-        </Card>
+          </section>
 
-        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-purple-500 rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <CompactPriceDisplay kesAmount={stats.totalRevenue} />
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.monthlyRevenue > 0 ? (
-                <span className="text-green-500">
-                  KES {stats.monthlyRevenue.toLocaleString()} this month
+          {/* Plan Status Card */}
+          <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-primary" />
+                Current Plan: {plan?.plans?.name || "Free"}
+              </CardTitle>
+              <CardDescription className="text-base">
+                Products:{" "}
+                <span className="font-semibold">
+                  {stats.totalProducts} / {getProductLimit() === Infinity ? "Unlimited" : getProductLimit()}
                 </span>
+              </CardDescription>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {getPlanFeatures().map((feature, i) => (
+                  <Badge key={i} variant="secondary" className="text-[10px] py-0">
+                    <CheckCircle2 className="h-2 w-2 mr-1 text-green-500" />
+                    {feature}
+                  </Badge>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!canAddMoreProducts && getProductLimit() !== Infinity ? (
+                <div className="flex items-center gap-4">
+                  <Badge variant="destructive" className="text-sm">
+                    Limit Reached
+                  </Badge>
+                  <Link to="/pricing">
+                    <Button className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90">
+                      Upgrade Plan
+                    </Button>
+                  </Link>
+                </div>
               ) : (
-                "No revenue yet"
+                <div className="space-y-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(
+                          (stats.totalProducts / getProductLimit()) * 100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {getProductLimit() - stats.totalProducts} products remaining
+                  </p>
+                </div>
               )}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/70 backdrop-blur-md border border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 border-l-4 border-l-orange-500 rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Messages</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalMessages}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalMessages === 0
-                ? "No new messages"
-                : "Unread messages"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Link to="/products/upload">
-          <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer border-2 border-dashed border-primary/20 hover:border-primary/40">
-            <CardContent className="p-6 text-center">
-              <Plus className="h-8 w-8 text-primary mx-auto mb-2" />
-              <p className="font-semibold">Add New Product</p>
-              <p className="text-sm text-muted-foreground">
-                {canAddMoreProducts
-                  ? "List a new item for sale"
-                  : "Upgrade to add more products"}
-              </p>
             </CardContent>
           </Card>
-        </Link>
 
-        <Link to="/messages">
-          <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <MessageSquare className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-              <p className="font-semibold">View Messages</p>
-              <p className="text-sm text-muted-foreground">
-                {stats.totalMessages === 0
-                  ? "No new messages"
-                  : `${stats.totalMessages} unread messages`}
-              </p>
+          {/* Shop Link Card */}
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <LinkIcon className="h-5 w-5 text-blue-600" />
+                Your Shop Link
+              </CardTitle>
+              <CardDescription>
+                Share this link to let customers view all your products in one place
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                {username ? (
+                  <div className="flex-1 w-full flex items-center gap-2 p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                    <span className="text-gray-500 font-medium">sellhubshop.co.ke/u/</span>
+                    <span className="font-bold text-blue-700">{username}</span>
+                  </div>
+                ) : (
+                  <div className="flex-1 w-full">
+                    <p className="text-sm text-yellow-600 mb-2 font-medium">
+                      <AlertCircle className="inline h-4 w-4 mr-1" />
+                      Set a username to create your unique shop link
+                    </p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Enter username (e.g. janeshop)" 
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        id="username-input"
+                      />
+                      <Button 
+                        onClick={async () => {
+                          const input = document.getElementById("username-input") as HTMLInputElement;
+                          const newUsername = input.value.trim();
+                          if (!newUsername) return;
+                          
+                          // Basic validation
+                          if (!/^[a-zA-Z0-9_-]+$/.test(newUsername)) {
+                            toast({ variant: "destructive", title: "Invalid format", description: "Username can only contain letters, numbers, underscores and dashes" });
+                            return;
+                          }
+
+                          try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (!user) return;
+
+                            // Check uniqueness
+                            const { data: existing } = await supabase.from('profiles').select('id').eq('username', newUsername).single();
+                            if (existing) {
+                              toast({ variant: "destructive", title: "Taken", description: "This username is already taken" });
+                              return;
+                            }
+
+                            const { error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', user.id);
+                            if (error) throw error;
+                            
+                            toast({ title: "Success", description: "Username set successfully!" });
+                            loadDashboardData();
+                          } catch (e: any) {
+                            toast({ variant: "destructive", title: "Error", description: e.message });
+                          }
+                        }}
+                      >
+                        Claim Link
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {username && (
+                   <Button
+                    variant="outline"
+                    className="w-full md:w-auto"
+                    onClick={() => {
+                       const url = `${window.location.origin}/u/${username}`;
+                       navigator.clipboard.writeText(url);
+                       toast({ title: "Copied!", description: "Shop link copied to clipboard" });
+                    }}
+                   >
+                     <LinkIcon className="h-4 w-4 mr-2" />
+                     Copy Link
+                   </Button>
+                )}
+                
+                {username && (
+                  <a href={`/u/${username}`} target="_blank" rel="noreferrer" className="w-full md:w-auto">
+                     <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                       Visit Shop
+                     </Button>
+                  </a>
+                )}
+              </div>
             </CardContent>
           </Card>
-        </Link>
+        </TabsContent>
 
-        <Link to="/analytics">
-          <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <TrendingUp className="h-8 w-8 text-green-500 mx-auto mb-2" />
-              <p className="font-semibold">View Analytics</p>
-              <p className="text-sm text-muted-foreground">
-                Track your sales and performance
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+        {/* TAB 2: MARKET INSIGHTS */}
+        <TabsContent value="market-insights" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+           <MarketInsights />
+        </TabsContent>
 
-      {/* Products Section */}
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Your Products ({products.length})
-            </CardTitle>
-            <CardDescription>
-              Manage your product listings and track performance
-            </CardDescription>
-          </div>
-          <Link to="/products/upload">
-            <Button
-              disabled={!canAddMoreProducts}
-              className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {products.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4 text-lg">
-                You haven't added any products yet
-              </p>
-              <p className="text-sm text-muted-foreground mb-6">
-                Start selling by adding your first product to the marketplace
-              </p>
+        {/* TAB 3: PRODUCTS */}
+        <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Your Products ({products.length})
+                </CardTitle>
+                <CardDescription>
+                  Manage your product listings and track performance
+                </CardDescription>
+              </div>
               <Link to="/products/upload">
                 <Button
-                  size="lg"
+                  disabled={!canAddMoreProducts}
                   className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Product
+                  Add Product
                 </Button>
               </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onDelete={deleteProduct}
-                  formatDate={formatDate}
-                  getStatusColor={getStatusColor}
-                  getStatusText={getStatusText}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent>
+              {products.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-4 text-lg">
+                    You haven't added any products yet
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Start selling by adding your first product to the marketplace
+                  </p>
+                  <Link to="/products/upload">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Product
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onDelete={deleteProduct}
+                      formatDate={formatDate}
+                      getStatusColor={getStatusColor}
+                      getStatusText={getStatusText}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

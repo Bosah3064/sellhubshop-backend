@@ -36,10 +36,7 @@ BEGIN
     -- 4. Update Transaction Status
     UPDATE public.wallet_transactions
     SET status = 'completed',
-        mpesa_receipt = p_mpesa_receipt, -- Ensure receipt is saved if not already
-        updated_at = now() -- Assuming there's a trigger or we specific column, checking schema... default table has created_at only? 
-        -- Creating logs showed wallet_transactions has created_at default now(). 
-        -- Let's just update the status/receipt.
+        mpesa_receipt = p_mpesa_receipt
     WHERE id = p_transaction_id;
 
     RETURN json_build_object('success', true, 'message', 'Deposit processed successfully', 'new_balance', (SELECT balance FROM public.wallets WHERE id = v_wallet_id));

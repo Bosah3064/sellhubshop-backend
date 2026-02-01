@@ -50,7 +50,7 @@ import { GrowthHacks } from "@/components/referrals/GrowthHacks";
 
 interface Referral {
   id: string;
-  status: "pending" | "completed" | "expired";
+  status: "pending" | "completed" | "expired" | "completed_capped";
   created_at: string;
   completed_at?: string;
   reward_amount: number;
@@ -420,7 +420,7 @@ export default function Referrals() {
 
           processedReferrals.push({
             id: referral.id,
-            status: referral.status as "pending" | "completed" | "expired",
+            status: referral.status as "pending" | "completed" | "expired" | "completed_capped",
             created_at: referral.created_at,
             completed_at: referral.updated_at,
             reward_amount: referral.reward_amount || currentTier.reward,
@@ -539,40 +539,7 @@ export default function Referrals() {
     }
   };
 
-  const handleRequestWithdrawal = async () => {
-    if (!currentUser) return;
-
-    const availableBalance = stats.total_earned - stats.successful_withdrawals - stats.pending_withdrawals;
-
-    if (availableBalance < 500) {
-      toast.error("Minimum withdrawal amount is KES 500");
-      return;
-    }
-
-    try {
-      setRequestingWithdrawal(true);
-      const { error } = await supabase
-        .from("withdrawals")
-        .insert({
-          id: crypto.randomUUID(),
-          user_id: currentUser.id,
-          amount: availableBalance,
-          status: "pending",
-          payment_method: "mpesa",
-          created_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
-      toast.success("Withdrawal request sent! Our team will process it manually.");
-      await loadWithdrawals(currentUser.id);
-    } catch (error: any) {
-      console.error("Error requesting withdrawal:", error);
-      toast.error(error.message || "Failed to request withdrawal");
-    } finally {
-      setRequestingWithdrawal(false);
-    }
-  };
+  // Manual withdrawal function removed in favor of automatic wallet deposits
 
   const setupRealtimeSubscriptions = (userId: string) => {
     const referralsSub = supabase
@@ -693,11 +660,13 @@ export default function Referrals() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-gradient-to-r from-green-500 to-green-600";
-      case "pending":
-        return "bg-gradient-to-r from-blue-500 to-blue-600";
-      case "expired":
+        return "bg-gradient-to-r from-emerald-500 to-emerald-600";
+      case "completed_capped":
         return "bg-gradient-to-r from-gray-500 to-gray-600";
+      case "pending":
+        return "bg-gradient-to-r from-amber-500 to-amber-600";
+      case "expired":
+        return "bg-gradient-to-r from-red-500 to-red-600";
       default:
         return "bg-gradient-to-r from-gray-500 to-gray-600";
     }
@@ -706,9 +675,11 @@ export default function Referrals() {
   const getStatusText = (status: string) => {
     switch (status) {
       case "completed":
-        return "Reward Earned 🎉";
+        return "Reward Paid 💰";
+      case "completed_capped":
+        return "Joined (Cap Reached) ✅";
       case "pending":
-        return "JOINED";
+        return "Pending Purchase ⏳";
       case "expired":
         return "Expired";
       default:
@@ -750,7 +721,7 @@ export default function Referrals() {
       color: "text-purple-600",
       bgColor: "bg-purple-100",
       borderColor: "border-purple-200",
-      description: "Lifetime rewards",
+      description: "Auto-deposited to Wallet",
       trend: stats.total_earned > 0 ? "up" : ("flat" as const),
     },
     {
@@ -1419,108 +1390,45 @@ export default function Referrals() {
         </Card>
 
         {/* Real-time Withdrawal Management - Mobile Optimized */}
+        {/* Wallet & Payouts Info - Mobile Optimized */}
         <Card className="p-4 sm:p-10 mt-6 sm:mt-12 bg-white/80 backdrop-blur-sm border-0 shadow-xl sm:shadow-2xl rounded-2xl sm:rounded-3xl">
-          <div className="flex flex-col gap-3 sm:gap-4 mb-6 sm:mb-10">
+          <div className="flex flex-col gap-3 sm:gap-4 mb-6 sm:mb-10 text-center">
             <div>
               <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-1 sm:mb-3">
-                Withdrawals
+                Wallet & Payouts 🏦
               </h2>
-              <p className="text-sm sm:text-xl text-muted-foreground">
-                Request payouts and track status
+              <p className="text-sm sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+                Rewards are automatically credited to your in-app Wallet immediately after verification. No manual request needed!
               </p>
             </div>
-            {(stats.total_earned - stats.successful_withdrawals - stats.pending_withdrawals) >= 500 && (
-              <Button
-                onClick={handleRequestWithdrawal}
-                disabled={requestingWithdrawal}
-                className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-6 text-sm sm:text-lg"
+            
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
+               <Button
+                onClick={() => window.location.href = '/wallet'}
+                className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg rounded-xl sm:rounded-2xl px-8 py-4 text-lg"
+                size="lg"
               >
-                {requestingWithdrawal ? (
-                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
-                ) : (
-                  <Wallet className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                )}
-                Request KES {(stats.total_earned - stats.successful_withdrawals - stats.pending_withdrawals).toLocaleString()}
+                <Wallet className="w-5 h-5 mr-2" />
+                Go to My Wallet
               </Button>
-            )}
-          </div>
-
-          {withdrawals.length === 0 ? (
-            <div className="text-center py-8 sm:py-16 bg-gray-50/50 rounded-2xl sm:rounded-3xl border-2 border-dashed border-gray-200">
-              <Wallet className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No Withdrawals Yet</h3>
-              <p className="text-sm sm:text-lg text-muted-foreground px-4">
-                Reach KES 500 to request your first payout.
-              </p>
             </div>
-          ) : (
-            <>
-              {/* Desktop Table */}
-              <div className="hidden sm:block overflow-hidden rounded-2xl border-2 border-gray-200 shadow-lg">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gradient-to-r from-emerald-500 to-blue-600">
-                      <th className="text-left py-6 px-8 text-lg font-bold text-white">Amount</th>
-                      <th className="text-left py-6 px-8 text-lg font-bold text-white">Date</th>
-                      <th className="text-left py-6 px-8 text-lg font-bold text-white">Status</th>
-                      <th className="text-left py-6 px-8 text-lg font-bold text-white">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {withdrawals.map((w) => (
-                      <tr key={w.id} className="border-b border-gray-100 hover:bg-emerald-50/50 transition-colors duration-200">
-                        <td className="py-5 px-8 font-bold text-emerald-600 text-lg">
-                          KES {w.amount.toLocaleString()}
-                        </td>
-                        <td className="py-5 px-8 text-gray-700">
-                          {new Date(w.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="py-5 px-8">
-                          <Badge className={`${w.status === 'completed' ? 'bg-green-500' :
-                            w.status === 'cancelled' ? 'bg-red-500' :
-                              w.status === 'processing' ? 'bg-blue-500' : 'bg-yellow-500'
-                            } text-white px-4 py-2 rounded-xl`}>
-                            {w.status.toUpperCase()}
-                          </Badge>
-                        </td>
-                        <td className="py-5 px-8 text-muted-foreground">
-                          {w.admin_notes || "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 text-left">
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                 <h3 className="font-bold text-emerald-800 mb-1">1. Automatic Credit</h3>
+                 <p className="text-sm text-emerald-700">Rewards hit your wallet instantly when your referral subscribes.</p>
               </div>
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                 <h3 className="font-bold text-blue-800 mb-1">2. Instant Withdrawals</h3>
+                 <p className="text-sm text-blue-700">Withdraw from your Wallet to M-Pesa anytime (min KES 50).</p>
+              </div>
+               <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                 <h3 className="font-bold text-purple-800 mb-1">3. Transparent History</h3>
+                 <p className="text-sm text-purple-700">Track every penny in your Wallet transaction history.</p>
+              </div>
+            </div>
 
-              {/* Mobile Card List */}
-              <div className="sm:hidden space-y-3">
-                {withdrawals.map((w) => (
-                  <div
-                    key={w.id}
-                    className="p-4 rounded-xl border border-gray-200 bg-white shadow-md"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="font-bold text-emerald-600 text-lg">
-                        KES {w.amount.toLocaleString()}
-                      </span>
-                      <Badge className={`${w.status === 'completed' ? 'bg-green-500' :
-                        w.status === 'cancelled' ? 'bg-red-500' :
-                          w.status === 'processing' ? 'bg-blue-500' : 'bg-yellow-500'
-                        } text-white px-2 py-1 text-xs rounded-lg`}>
-                        {w.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center text-sm text-muted-foreground">
-                      <span>{new Date(w.created_at).toLocaleDateString()}</span>
-                      {w.admin_notes && (
-                        <span className="text-xs truncate max-w-[120px]">{w.admin_notes}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          </div>
         </Card>
       </div>
     </div>

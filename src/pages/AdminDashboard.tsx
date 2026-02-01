@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -22,6 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BannerCarousel } from "@/pages/BannerCarousel";
 import { AdminBannerManager } from "@/pages/AdminBannerManager";
+import AdminWallets from "@/pages/AdminWallets";
+import { AdminSystemScan } from "@/components/admin/AdminSystemScan";
 import TwoFactorSetup from "@/components/admin/TwoFactorSetup";
 import {
   Users,
@@ -163,6 +166,11 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
+
+import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
+import { UserManagement } from "@/components/admin/UserManagement";
+import { AdminAuditLogs } from "@/components/admin/AdminAuditLogs";
+import { SystemMonitoring } from "@/components/admin/SystemMonitoring";
 import { cn } from "@/lib/utils";
 
 // Enhanced Types
@@ -435,6 +443,7 @@ const useAdminPermissions = (currentAdmin: AdminUser | null) => {
 };
 
 export default function UltimateAdminDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalProducts: 0,
@@ -600,11 +609,11 @@ export default function UltimateAdminDashboard() {
       { value: "banners", label: "Banners", icon: Megaphone },
       { value: "reports", label: "Reports", icon: Flag },
       { value: "subscriptions", label: "Subscriptions", icon: Crown },
-      { value: "withdrawals", label: "Withdrawals", icon: Wallet },
+      { value: "withdrawals", label: "Wallets", icon: Wallet },
       { value: "admins", label: "Admins", icon: Shield },
-      { value: "analytics", label: "Analytics", icon: BarChart4 },
       { value: "system", label: "System", icon: Settings },
       { value: "security", label: "Security", icon: ShieldAlert },
+      { value: "health", label: "System Health", icon: Activity },
     ];
 
     return allTabs.filter((tab) => {
@@ -615,8 +624,6 @@ export default function UltimateAdminDashboard() {
           return permissions.canViewSubscriptions;
         case "admins":
           return permissions.canViewAdmins;
-        case "analytics":
-          return permissions.canViewAnalytics;
         case "system":
           return permissions.canManageSystem;
         case "banners":
@@ -2057,21 +2064,44 @@ export default function UltimateAdminDashboard() {
 
     setLoading("add-admin", true);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-      const response = await fetch(`${backendUrl}/api/admin/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          role,
-          permissions: role === 'super_admin' ? {} : newAdminPermissions
-        })
-      });
-      const result = await response.json();
+      // First, check if user exists in auth
+      const { data: existingUser } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", email.trim().toLowerCase())
+        .single();
 
-      if (!result.success) {
-        throw new Error(result.error || "Failed to add admin");
+      if (!existingUser) {
+        throw new Error("User must sign up first before being added as admin");
       }
+
+      // Check if already an admin
+      const { data: existingAdmin } = await supabase
+        .from("admin_users")
+        .select("id")
+        .eq("user_id", existingUser.id)
+        .single();
+
+      if (existingAdmin) {
+        throw new Error("User is already an admin");
+      }
+
+      // Create admin record with generated UUID
+      const adminId = crypto.randomUUID();
+      const { error: insertError } = await supabase
+        .from("admin_users")
+        .insert({
+          id: adminId,
+          user_id: existingUser.id,
+          email: email.trim().toLowerCase(),
+          role: role,
+          permissions: role === 'super_admin' ? {} : newAdminPermissions,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) throw insertError;
 
       toast({
         title: "Admin Added",
@@ -2086,8 +2116,8 @@ export default function UltimateAdminDashboard() {
       await logAdminAction(
         "create",
         "admin_user",
-        result.data?.id || "unknown",
-        { target_email: email, role }
+        adminId,
+        { target_email: email, role, user_id: existingUser.id }
       );
 
     } catch (error: any) {
@@ -3281,71 +3311,75 @@ export default function UltimateAdminDashboard() {
 
   // UI Components with permission checks
   const renderHeader = () => (
-    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-      <div className="flex items-center gap-4">
-        <div
-          className={`p-2 rounded-lg ${isSuperAdmin
-            ? "bg-gradient-to-br from-red-600 to-pink-600"
-            : hasAdminRole
-              ? "bg-gradient-to-br from-blue-600 to-purple-600"
-              : "bg-gradient-to-br from-green-600 to-teal-600"
-            }`}
-        >
-          <Shield className="h-8 w-8 text-white" />
+    <div className="admin-glass p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-2xl animate-fade-in border border-white/5">
+      <div className="flex items-center gap-6">
+        <div className="relative group cursor-default">
+          <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-2xl blur opacity-25 group-hover:opacity-60 transition duration-1000 group-hover:duration-200 animate-glow-pulse"></div>
+          <div
+            className={`relative p-3 rounded-2xl ${isSuperAdmin
+              ? "bg-gradient-to-br from-rose-600/30 to-pink-600/30 shadow-[0_0_20px_rgba(244,63,94,0.3)]"
+              : hasAdminRole
+                ? "bg-gradient-to-br from-violet-600/30 to-cyan-600/30 shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+                : "bg-gradient-to-br from-emerald-600/30 to-teal-600/30 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+              } border border-white/20 backdrop-blur-md`}
+          >
+            <Shield className="h-8 w-8 text-white animate-float" />
+          </div>
         </div>
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-br from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Admin Dashboard
+          <h1 className="text-5xl font-black tracking-tighter text-slate-900 mb-1">
+            <span className="text-nebula-gradient">Control</span> Center
           </h1>
-          <p className="text-muted-foreground">
-            {isSuperAdmin
-              ? "Super Administrator"
-              : hasAdminRole
-                ? "Administrator"
-                : "Moderator"}
-            <Badge variant="secondary" className="ml-2">
-              {currentAdmin?.role} •{" "}
-              {isModerator ? "Limited Access" : "Full Access"}
+          <div className="flex items-center gap-3">
+             <Badge className="bg-violet-500/10 text-violet-600 border-none px-3 py-1 font-bold text-[10px] tracking-widest uppercase">
+              {currentAdmin?.role?.replace('_', ' ') || 'Admin'}
             </Badge>
-          </p>
+            <span className="w-1 h-1 rounded-full bg-slate-900/10" />
+            <p className="text-slate-600 text-sm font-medium">
+              {isModerator ? "Security Protocol: Active (Limited)" : "Security Protocol: Active (Full Access)"}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/40 p-2 rounded-2xl border border-white/60 shadow-sm backdrop-blur-xl w-full lg:w-auto">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search everything..."
+            placeholder="Search platform ecosystem..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-80"
+            className="pl-12 w-full bg-white/50 border-white/20 text-slate-900 placeholder:text-slate-400 focus:ring-violet-500 focus:border-violet-500 rounded-xl h-11 transition-all"
           />
         </div>
 
+        <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-1" />
+
         {permissions.canExportData && (
-          <Button variant="outline" size="icon" onClick={() => setShowExportDialog(true)}>
-            <Download className="h-4 w-4" />
+          <Button variant="ghost" size="icon" onClick={() => setShowExportDialog(true)} className="text-slate-400 hover:text-slate-600 hover:bg-white/50 h-11 w-11 rounded-xl">
+            <Download className="h-5 w-5" />
           </Button>
         )}
 
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           onClick={loadDashboardData}
           disabled={loadingStates.refresh}
+          className="text-slate-400 hover:text-slate-600 hover:bg-white/50 h-11 w-11 rounded-xl"
         >
           <RefreshCw
-            className={`h-4 w-4 ${loadingStates.refresh ? "animate-spin" : ""}`}
+            className={`h-5 w-5 ${loadingStates.refresh ? "animate-spin" : ""}`}
           />
         </Button>
 
         {permissions.canManageSystem && (
           <Button
             onClick={() => setShowSystemSettingsDialog(true)}
-            variant="outline"
+            className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-11 px-6 rounded-xl shadow-lg shadow-violet-600/20 border-none transition-all"
           >
             <Settings2 className="h-4 w-4 mr-2" />
-            Settings
+            System Control
           </Button>
         )}
       </div>
@@ -3353,81 +3387,123 @@ export default function UltimateAdminDashboard() {
   );
 
   const renderQuickActions = () => (
-    <Card className="lg:col-span-2 xl:col-span-1">
+    <Card className="admin-glass border-none shadow-2xl h-full hover-glow-nebula transition-all duration-500">
       <CardHeader>
-        <CardTitle>Quick Actions</CardTitle>
-        <CardDescription>Frequently used tasks</CardDescription>
+        <CardTitle className="text-slate-900 text-lg">Command Execution</CardTitle>
+        <CardDescription className="text-slate-500 text-xs text-opacity-70">High-priority operational protocols</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           {permissions.canApproveProducts && (
             <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col gap-2"
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-50 hover:bg-violet-50 hover:text-violet-600 transition-all border border-slate-100 group"
               onClick={() => setActiveTab("pending")}
             >
-              <Clock className="h-5 w-5" />
-              <span className="text-xs">
-                Review Pending ({stats.pendingProducts})
-              </span>
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-violet-100 transition-colors">
+                <Clock className="h-6 w-6 text-violet-500" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Review Queue</p>
+                <p className="text-xs font-bold text-slate-700">{stats.pendingProducts} Pending</p>
+              </div>
             </Button>
           )}
 
           {permissions.canResolveReports && (
             <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col gap-2"
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-50 hover:bg-rose-50 hover:text-rose-600 transition-all border border-slate-100 group"
               onClick={() => setActiveTab("reports")}
             >
-              <Flag className="h-5 w-5" />
-              <span className="text-xs">
-                Handle Reports ({stats.pendingReports})
-              </span>
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-rose-100 transition-colors">
+                <Flag className="h-6 w-6 text-rose-500" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Integrity Hub</p>
+                <p className="text-xs font-bold text-slate-700">{stats.pendingReports} Alerts</p>
+              </div>
             </Button>
           )}
 
           {permissions.canManageCategories && (
             <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col gap-2"
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-slate-100 group"
               onClick={() => setShowCategoryDialog(true)}
             >
-              <Plus className="h-5 w-5" />
-              <span className="text-xs">Add Category</span>
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-emerald-100 transition-colors">
+                <Plus className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">System Taxonomy</p>
+                <p className="text-xs font-bold text-slate-700">New Category</p>
+              </div>
             </Button>
           )}
 
           {permissions.canSendEmails && (
             <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col gap-2"
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-50 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-100 group"
               onClick={() => setShowEmailTemplateDialog(true)}
             >
-              <Mail className="h-5 w-5" />
-              <span className="text-xs">Email Users</span>
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-blue-100 transition-colors">
+                <Mail className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Comm-Link</p>
+                <p className="text-xs font-bold text-slate-700">Broadcast</p>
+              </div>
             </Button>
           )}
 
           {permissions.canPerformBulkActions && (
             <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col gap-2"
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-100/50 hover:bg-slate-100 transition-all border border-slate-200 group"
               onClick={() => setShowBulkActionDialog(true)}
             >
-              <Users2 className="h-5 w-5" />
-              <span className="text-xs">Bulk Actions</span>
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-slate-200 transition-colors">
+                <Users2 className="h-6 w-6 text-slate-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Mass Protocol</p>
+                <p className="text-xs font-bold text-slate-700">Bulk Actions</p>
+              </div>
+            </Button>
+          )}
+
+          {permissions.canViewProducts && (
+            <Button
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-slate-100 group"
+              onClick={() => setActiveTab("products")}
+            >
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-emerald-100 transition-colors">
+                <Package className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Inventory Hub</p>
+                <p className="text-xs font-bold text-slate-700">{stats.totalProducts - stats.pendingProducts} Active</p>
+              </div>
             </Button>
           )}
 
           {permissions.canBackupSystem && (
             <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col gap-2"
+              variant="ghost"
+              className="h-auto py-4 flex flex-col gap-3 rounded-2xl bg-slate-50 hover:bg-violet-50 hover:text-violet-600 transition-all border border-slate-100 group"
               onClick={() => setShowBackupDialog(true)}
               disabled={loadingStates["system-backup"]}
             >
-              <DownloadCloud className="h-5 w-5" />
-              <span className="text-xs">Backup System</span>
+              <div className="p-3 bg-white shadow-sm rounded-xl group-hover:bg-violet-100 transition-colors">
+                <DownloadCloud className="h-6 w-6 text-violet-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Archival</p>
+                <p className="text-xs font-bold text-slate-700">Cloud Backup</p>
+              </div>
             </Button>
           )}
         </div>
@@ -3499,146 +3575,149 @@ export default function UltimateAdminDashboard() {
           </div>
         )}
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {permissions.canBanUsers && (
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={
-                      selectedUsers.length === users.length && users.length > 0
-                    }
-                    onCheckedChange={(checked) => {
-                      setSelectedUsers(checked ? users.map((u) => u.id) : []);
-                    }}
-                  />
-                </TableHead>
-              )}
-              <TableHead>User</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Products</TableHead>
-              <TableHead>Joined</TableHead>
-              {permissions.canBanUsers && <TableHead>Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {permissions.canBanUsers && (
-                  <TableCell>
+                  <TableHead className="w-12 whitespace-nowrap">
                     <Checkbox
-                      checked={selectedUsers.includes(user.id)}
+                      checked={
+                        selectedUsers.length === users.length && users.length > 0
+                      }
                       onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedUsers([...selectedUsers, user.id]);
-                        } else {
-                          setSelectedUsers(
-                            selectedUsers.filter((id) => id !== user.id)
-                          );
-                        }
+                        setSelectedUsers(checked ? users.map((u) => u.id) : []);
                       }}
                     />
-                  </TableCell>
+                  </TableHead>
                 )}
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      {user.avatar_url ? (
-                        <AvatarImage src={user.avatar_url} />
-                      ) : (
-                        <AvatarFallback>
-                          {user.email?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{user.email}</div>{" "}
-                      {/* ← FIXED */}
-                      <div className="text-sm text-muted-foreground">
-                        {" "}
-                        {/* ← FIXED */}
-                        {user.full_name}
+                <TableHead className="whitespace-nowrap">User</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap">Products</TableHead>
+                <TableHead className="whitespace-nowrap">Joined</TableHead>
+                {permissions.canBanUsers && <TableHead className="whitespace-nowrap">Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  {permissions.canBanUsers && (
+                    <TableCell className="whitespace-nowrap">
+                      <Checkbox
+                        checked={selectedUsers.includes(user.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedUsers([...selectedUsers, user.id]);
+                          } else {
+                            setSelectedUsers(
+                              selectedUsers.filter((id) => id !== user.id)
+                            );
+                          }
+                        }}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell className="whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        {user.avatar_url ? (
+                          <AvatarImage src={user.avatar_url} />
+                        ) : (
+                          <AvatarFallback>
+                            {user.email?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{user.email}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {user.full_name}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      user.status === "active"
-                        ? "default"
-                        : user.status === "banned"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {user.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>{user.products_count || 0}</TableCell>
-                <TableCell>
-                  {new Date(user.created_at).toLocaleDateString()}
-                </TableCell>
-                {permissions.canBanUsers && (
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowUserDialog(true);
-                        }}
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      {user.status === "active" ? (
-                        <>
-                          {permissions.canSuspendUsers && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setUserToSuspend(user.id);
-                                setShowSuspendDialog(true);
-                              }}
-                            >
-                              <Ban className="h-3 w-3" />
-                            </Button>
-                          )}
-                          {permissions.canBanUsers && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                setUserToBan(user.id);
-                                setShowBanDialog(true);
-                              }}
-                            >
-                              <Ban className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        permissions.canBanUsers && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUnbanUser(user.id)}
-                            disabled={loadingStates[`unban-${user.id}`]}
-                          >
-                            <Unlock className="h-3 w-3" />
-                          </Button>
-                        )
-                      )}
-                    </div>
                   </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                  <TableCell className="whitespace-nowrap">
+                    <Badge
+                      variant={
+                        user.status === "active"
+                          ? "default"
+                          : user.status === "banned"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {user.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{user.products_count || 0}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </TableCell>
+                  {permissions.canBanUsers && (
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowUserDialog(true);
+                          }}
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {user.status === "active" ? (
+                          <>
+                            {permissions.canSuspendUsers && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setUserToSuspend(user.id);
+                                  setShowSuspendDialog(true);
+                                }}
+                                className="h-8 w-8 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {permissions.canBanUsers && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setUserToBan(user.id);
+                                  setShowBanDialog(true);
+                                }}
+                                className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          permissions.canBanUsers && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUnbanUser(user.id)}
+                              disabled={loadingStates[`unban-${user.id}`]}
+                              className="h-8 w-8 p-0 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                            >
+                              <Unlock className="h-4 w-4" />
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -3647,91 +3726,101 @@ export default function UltimateAdminDashboard() {
     if (!permissions.canViewAdmins) return null;
 
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="admin-glass border-none shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <CardHeader className="flex flex-row items-center justify-between pb-6">
           <div>
-            <CardTitle>Admin Management</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-slate-900 text-xl">Governance Board</CardTitle>
+            <CardDescription className="text-slate-500">
               {permissions.canManageAdmins
-                ? "Manage platform administrators"
-                : "View admin team"}
+                ? "Authorization matrix and administrative protocols"
+                : "Active governance oversight team"}
             </CardDescription>
           </div>
           {permissions.canManageAdmins && (
-            <Button onClick={() => setShowAddAdminDialog(true)}>
+            <Button 
+              onClick={() => setShowAddAdminDialog(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg border-none"
+            >
               <UserPlus className="h-4 w-4 mr-2" />
-              Add Admin
+              Assign Proxy
             </Button>
           )}
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Admin</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Added</TableHead>
-                {permissions.canManageAdmins && <TableHead>Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {adminUsers.map((admin) => (
-                <TableRow key={admin.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback>
-                          {admin.email?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{admin.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {admin.full_name}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        admin.role === "super_admin"
-                          ? "destructive"
-                          : admin.role === "admin"
-                            ? "default"
-                            : "secondary"
-                      }
-                    >
-                      {admin.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={admin.is_active ? "default" : "secondary"}>
-                      {admin.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(admin.created_at).toLocaleDateString()}
-                  </TableCell>
-                  {permissions.canManageAdmins && (
-                    <TableCell>
-                      {admin.role !== "super_admin" && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleRemoveAdmin(admin.id)}
-                          disabled={loadingStates[`remove-admin-${admin.id}`]}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  )}
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="border-slate-100 hover:bg-transparent">
+                  <TableHead className="text-slate-500 pl-6 whitespace-nowrap">Administrative Unit</TableHead>
+                  <TableHead className="text-slate-500 whitespace-nowrap">Privilege Tier</TableHead>
+                  <TableHead className="text-slate-500 text-center whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-slate-500 whitespace-nowrap">Deployment</TableHead>
+                  {permissions.canManageAdmins && <TableHead className="text-slate-500 text-right pr-6 whitespace-nowrap">Management</TableHead>}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {adminUsers.map((admin) => (
+                  <TableRow key={admin.id} className="border-slate-100 hover:bg-slate-50 transition-colors">
+                    <TableCell className="pl-6 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 border border-slate-200">
+                          <AvatarFallback className="bg-violet-100 text-violet-600 text-[10px] font-bold">
+                            {admin.email?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{admin.email}</p>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-widest">
+                            {admin.full_name}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Badge
+                        variant="outline"
+                        className={`rounded-full px-3 py-0.5 text-[10px] uppercase font-black border-none ${
+                          admin.role === "super_admin"
+                            ? "bg-rose-600 text-white"
+                            : admin.role === "admin"
+                              ? "bg-blue-50 text-blue-600"
+                              : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {admin.role.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center whitespace-nowrap">
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                        admin.is_active ? "text-emerald-600 bg-emerald-50" : "text-slate-400 bg-slate-50"
+                      }`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? "bg-emerald-500" : "bg-slate-300"}`} />
+                        {admin.is_active ? "Operational" : "Inactive"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                      {new Date(admin.created_at).toLocaleDateString()}
+                    </TableCell>
+                    {permissions.canManageAdmins && (
+                      <TableCell className="text-right pr-6 whitespace-nowrap">
+                        {admin.role !== "super_admin" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveAdmin(admin.id)}
+                            disabled={loadingStates[`remove-admin-${admin.id}`]}
+                            className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     );
@@ -3739,49 +3828,67 @@ export default function UltimateAdminDashboard() {
 
   const renderProductActions = (product: Product) => {
     return (
-      <div className="flex gap-2">
+      <div className="flex items-center justify-end gap-2">
         {permissions.canApproveProducts && product.status === "pending" && (
           <Button
             size="sm"
             onClick={() => handleApproveProduct(product.id)}
             disabled={loadingStates[`approve-${product.id}`]}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm"
           >
-            <CheckCircle className="h-3 w-3 mr-1" />
+            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
             Approve
           </Button>
         )}
         {permissions.canRejectProducts && product.status === "pending" && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => {
               setProductToReject(product.id);
               setShowRejectDialog(true);
             }}
+            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 font-bold rounded-lg"
           >
-            <X className="h-3 w-3 mr-1" />
+            <X className="h-3.5 w-3.5 mr-1.5" />
             Reject
           </Button>
         )}
         {permissions.canFeatureProducts && (
-          <Switch
-            checked={product.featured}
-            onCheckedChange={(checked) =>
-              handleFeatureProduct(product.id, checked)
-            }
-            disabled={loadingStates[`feature-${product.id}`]}
-          />
+          <div className="flex items-center gap-2 px-2 bg-slate-50 rounded-lg border border-slate-100 h-8">
+            <span className="text-[10px] font-black uppercase tracking-tighter text-slate-400">Featured</span>
+            <Switch
+              checked={product.featured}
+              onCheckedChange={(checked) =>
+                handleFeatureProduct(product.id, checked)
+              }
+              disabled={loadingStates[`feature-${product.id}`]}
+              className="scale-75"
+            />
+          </div>
         )}
         {permissions.canDeleteProducts && (
           <Button
-            variant="destructive"
+            variant="ghost"
             size="sm"
             onClick={() => handleDeleteProduct(product.id)}
             disabled={loadingStates[`delete-${product.id}`]}
+            className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-4 w-4" />
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setSelectedProduct(product);
+            setShowProductDialog(true);
+          }}
+          className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
       </div>
     );
   };
@@ -3823,1595 +3930,780 @@ export default function UltimateAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
-      <div className="container mx-auto py-6 space-y-6">
+    <div className="min-h-screen crystal-bg text-slate-900 selection:bg-violet-500/30 overflow-x-hidden relative">
+      {/* Crystal Particles */}
+      <div className="nebula-particle w-[400px] h-[400px] bg-violet-400/10 top-[-10%] left-[-5%] animate-float-particle" />
+      <div className="nebula-particle w-[300px] h-[300px] bg-cyan-400/10 top-[40%] right-[-5%] animate-float-particle [animation-delay:2s]" />
+      <div className="nebula-particle w-[500px] h-[500px] bg-pink-400/10 bottom-[-10%] left-[20%] animate-float-particle [animation-delay:4s]" />
+
+      <div className="container mx-auto py-8 px-4 lg:px-8 space-y-8 max-w-[1600px] relative z-10">
         {renderHeader()}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm font-medium">
-                    Total Users
-                  </p>
-                  <p className="text-xl font-bold">{stats.totalUsers}</p>
-                  <p className="text-blue-200 text-xs">
-                    +{stats.todayRegistrations} today
-                  </p>
-                </div>
-                <Users className="h-6 w-6 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
+        <AdminAnalytics 
+          stats={stats}
+          revenueData={chartRevenueData}
+          userGrowthData={chartUserGrowthData}
+        />
 
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">Revenue</p>
-                  <p className="text-xl font-bold">
-                    KES {stats.totalRevenue.toLocaleString()}
-                  </p>
-                  <p className="text-green-200 text-xs">
-                    {stats.weeklyGrowth}% growth
-                  </p>
-                </div>
-                <DollarSign className="h-6 w-6 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-sm font-medium">Pending</p>
-                  <p className="text-xl font-bold">{stats.pendingProducts}</p>
-                  <p className="text-orange-200 text-xs">
-                    {stats.pendingReports} reports
-                  </p>
-                </div>
-                <Clock className="h-6 w-6 text-orange-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-sm font-medium">
-                    System Health
-                  </p>
-                  <p className="text-xl font-bold">{stats.systemHealth}%</p>
-                  <p className="text-purple-200 text-xs">
-                    {stats.serverLoad}% load
-                  </p>
-                </div>
-                <Activity className="h-6 w-6 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-red-100 text-sm font-medium">
-                    Subscriptions
-                  </p>
-                  <p className="text-xl font-bold">
-                    {stats.activeSubscriptions}
-                  </p>
-                  <p className="text-red-200 text-xs">Active plans</p>
-                </div>
-                <Crown className="h-6 w-6 text-red-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-indigo-100 text-sm font-medium">
-                    Engagement
-                  </p>
-                  <p className="text-xl font-bold">
-                    {stats.userEngagement.toFixed(1)}%
-                  </p>
-                  <p className="text-indigo-200 text-xs">
-                    {stats.unreadMessages} messages
-                  </p>
-                </div>
-                <TrendingUp className="h-6 w-6 text-indigo-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Visual Analytics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue Trend</CardTitle>
-              <CardDescription>Monthly revenue last 6 months</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <ReBarChart data={chartRevenueData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <ReXAxis dataKey="name" />
-                  <ReYAxis />
-                  <ReTooltip
-                    formatter={(value: any) => [`KES ${Number(value).toLocaleString()}`, 'Revenue']}
-                  />
-                  <Legend />
-                  <ReBar dataKey="revenue" fill="#16a34a" name="Revenue" radius={[4, 4, 0, 0]} />
-                </ReBarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>User Growth</CardTitle>
-              <CardDescription>New registrations last 6 months</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <ReLineChart data={chartUserGrowthData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <ReXAxis dataKey="name" />
-                  <ReYAxis />
-                  <ReTooltip />
-                  <Legend />
-                  <ReLine type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={2} name="New Users" />
-                </ReLineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="space-y-6"
+          className="space-y-8 relative"
         >
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-10 h-auto p-1 bg-slate-100/50 rounded-lg overflow-x-auto">
-            {getVisibleTabs().map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
-              >
-                <tab.icon className="h-4 w-4" />
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="bg-white/80 backdrop-blur-md p-2 rounded-2xl border border-slate-200 shadow-xl sticky top-4 z-40 overflow-hidden">
+            <TabsList className="flex w-full bg-slate-100/50 rounded-xl h-auto p-1 gap-1 overflow-x-auto no-scrollbar min-w-max sm:min-w-0">
+              {getVisibleTabs().map((tab) => (
+                tab.value === "withdrawals" ? (
+                  <div
+                    key={tab.value}
+                    onClick={() => navigate("/admin/wallets")}
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold rounded-xl cursor-pointer transition-all text-slate-400 hover:text-slate-600 hover:bg-slate-100 whitespace-nowrap"
+                    role="button"
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    {tab.label}
+                  </div>
+                ) : (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white text-slate-500 hover:text-slate-900 border-none shadow-sm data-[state=active]:shadow-violet-600/20 whitespace-nowrap"
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    {tab.label}
+                  </TabsTrigger>
+                )
+              ))}
+            </TabsList>
+          </div>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {renderQuickActions()}
+          <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500">
+             <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+               <div className="xl:col-span-1">
+                 {renderQuickActions()}
+               </div>
+               <div className="xl:col-span-3 space-y-8">
+                 <SystemMonitoring 
+                    health={systemHealth || undefined}
+                    onRefresh={loadDashboardData}
+                 />
+                 <AdminAuditLogs logs={adminActions} />
+               </div>
+             </div>
+          </TabsContent>
 
-              {/* System Health */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Health</CardTitle>
-                  <CardDescription>
-                    Platform performance metrics
-                  </CardDescription>
+          {/* Product Management Tab */}
+          <TabsContent value="products" className="animate-in fade-in duration-500">
+            {permissions.canViewProducts ? (
+              <Card className="admin-glass border-none shadow-2xl">
+                <CardHeader className="flex flex-row items-center justify-between pb-6">
+                  <div>
+                    <CardTitle className="text-slate-900 text-xl">Inventory Management</CardTitle>
+                    <CardDescription className="text-slate-500">Global registry of platform product listings</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <Badge className="bg-blue-600/10 text-blue-600 border-none px-4 py-1.5 font-bold text-xs uppercase">
+                      {approvedProducts.length} Active Units
+                    </Badge>
+                  </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Server Status</span>
-                      <Badge variant="default" className="bg-green-500">
-                        <Wifi className="h-3 w-3 mr-1" />
-                        Online
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Database</span>
-                        <span className="text-sm text-muted-foreground">
-                          {systemHealth?.database_size}
-                        </span>
-                      </div>
-                      <Progress value={90} className="h-2" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          Cache Hit Rate
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {systemHealth?.cache_hit_rate}%
-                        </span>
-                      </div>
-                      <Progress
-                        value={systemHealth?.cache_hit_rate || 0}
-                        className="h-2"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          Active Connections
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {systemHealth?.active_connections}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setActiveTab("system")}
-                      >
-                        <Server className="h-4 w-4 mr-2" />
-                        View Detailed Metrics
-                      </Button>
-                    </div>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow className="border-slate-100 hover:bg-transparent">
+                          <TableHead className="text-slate-500 pl-6 whitespace-nowrap">Product</TableHead>
+                          <TableHead className="text-slate-500 whitespace-nowrap">Seller</TableHead>
+                          <TableHead className="text-slate-500 text-center whitespace-nowrap">Price</TableHead>
+                          <TableHead className="text-slate-500 text-center whitespace-nowrap">Status</TableHead>
+                          <TableHead className="text-slate-500 whitespace-nowrap">Listed On</TableHead>
+                          <TableHead className="text-slate-500 text-right pr-6 whitespace-nowrap">Commands</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {approvedProducts.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-24">
+                              <div className="flex flex-col items-center gap-4">
+                                <div className="p-4 bg-slate-100 rounded-full">
+                                  <Package className="h-12 w-12 text-slate-400 opacity-20" />
+                                </div>
+                                <p className="text-slate-400 font-medium">No active products found in the ecosystem.</p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          approvedProducts.map((product) => (
+                            <TableRow key={product.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                              <TableCell className="pl-6 whitespace-nowrap">
+                                <div className="flex items-center gap-4">
+                                  {product.images?.[0] ? (
+                                    <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-slate-200 group-hover:border-violet-500/50 transition-colors">
+                                      <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                      <Package className="h-6 w-6 text-slate-300" />
+                                    </div>
+                                  )}
+                                  <div className="space-y-1">
+                                    <p className="font-bold text-slate-900 text-sm line-clamp-1">{product.name}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">PK: {product.id.slice(0, 8)}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                <p className="text-xs text-slate-600">{product.seller_email}</p>
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                <p className="text-sm font-bold text-emerald-600 font-mono">KES {product.price?.toLocaleString()}</p>
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-none text-[10px] font-black uppercase">
+                                  Operational
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-slate-400 font-medium whitespace-nowrap">
+                                {new Date(product.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell className="text-right pr-6 whitespace-nowrap">
+                                {renderProductActions(product)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Recent Activity */}
-              <Card className="lg:col-span-2 xl:col-span-1">
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Latest platform events</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {adminActions.slice(0, 5).map((action) => (
-                      <div
-                        key={action.id}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50"
-                      >
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs bg-blue-100 text-blue-600">
-                            {action.admin_email?.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium capitalize">
-                            {action.action_type.replace(/_/g, " ")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {action.admin_email} •{" "}
-                            {new Date(action.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {action.resource_type}
-                        </Badge>
-                      </div>
-                    ))}
-                    <Button
-                      variant="ghost"
-                      className="w-full"
-                      onClick={() => setShowAdminActionsDialog(true)}
-                    >
-                      View All Activity
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Revenue Chart Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue Analytics</CardTitle>
-                <CardDescription>
-                  Weekly revenue and order trends
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64 flex items-center justify-center border rounded-lg bg-gradient-to-br from-slate-50 to-blue-50/30">
-                  <div className="text-center">
-                    <BarChart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">
-                      Revenue chart visualization
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Total Revenue:{" "}
-                      <strong>KES {stats.totalRevenue.toLocaleString()}</strong>
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Products Tab */}
-          <TabsContent value="products">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Product Management</CardTitle>
-                  <CardDescription>
-                    Manage all sellhubshop listings
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  {selectedProducts.length > 0 &&
-                    permissions.canPerformBulkActions && (
-                      <>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline">
-                              Bulk Actions ({selectedProducts.length})
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleBulkAction(
-                                  "approve",
-                                  "products",
-                                  selectedProducts
-                                )
-                              }
-                            >
-                              Approve Selected
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleBulkAction(
-                                  "feature",
-                                  "products",
-                                  selectedProducts
-                                )
-                              }
-                            >
-                              Feature Selected
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleBulkAction(
-                                  "delete",
-                                  "products",
-                                  selectedProducts
-                                )
-                              }
-                            >
-                              Delete Selected
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Button
-                          variant="ghost"
-                          onClick={() => setSelectedProducts([])}
-                        >
-                          Clear
-                        </Button>
-                      </>
-                    )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
-                        <Filter className="h-4 w-4 mr-2" />
-                        Filter
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem>All Products</DropdownMenuItem>
-                      <DropdownMenuItem>Active Products</DropdownMenuItem>
-                      <DropdownMenuItem>Featured Products</DropdownMenuItem>
-                      <DropdownMenuItem>Verified Products</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {permissions.canPerformBulkActions && (
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={
-                              selectedProducts.length ===
-                              approvedProducts.length &&
-                              approvedProducts.length > 0
-                            }
-                            onCheckedChange={(checked) => {
-                              setSelectedProducts(
-                                checked ? approvedProducts.map((p) => p.id) : []
-                              );
-                            }}
-                          />
-                        </TableHead>
-                      )}
-                      <TableHead>Image</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Seller</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Category</TableHead>
-                      {permissions.canFeatureProducts && (
-                        <TableHead>Featured</TableHead>
-                      )}
-                      {permissions.canVerifyProducts && (
-                        <TableHead>Verified</TableHead>
-                      )}
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {approvedProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        {permissions.canPerformBulkActions && (
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedProducts.includes(product.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedProducts([
-                                    ...selectedProducts,
-                                    product.id,
-                                  ]);
-                                } else {
-                                  setSelectedProducts(
-                                    selectedProducts.filter(
-                                      (id) => id !== product.id
-                                    )
-                                  );
-                                }
-                              }}
-                            />
-                          </TableCell>
-                        )}
-                        <TableCell>
-                          <Avatar className="h-12 w-12 border rounded-md">
-                            <AvatarImage
-                              src={product.images?.[0] || product.image}
-                              alt={product.name}
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="bg-blue-100 text-blue-600 rounded-md">
-                              {product.name?.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {/* Removed duplicate avatar from here, moved to separate column */}
-                            <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {product.description?.substring(0, 50)}...
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          <div className="flex flex-col">
-                            <span>KES {product.price?.toLocaleString()}</span>
-
-                          </div>
-                        </TableCell>
-                        <TableCell>{product.seller_email}</TableCell>
-                        <TableCell>
-                          <Badge variant="default">{product.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {product.category_name || "Uncategorized"}
-                          </Badge>
-                        </TableCell>
-                        {permissions.canFeatureProducts && (
-                          <TableCell>
-                            <Switch
-                              checked={product.featured}
-                              onCheckedChange={(checked) =>
-                                handleFeatureProduct(product.id, checked)
-                              }
-                              disabled={loadingStates[`feature-${product.id}`]}
-                            />
-                          </TableCell>
-                        )}
-                        {permissions.canVerifyProducts && (
-                          <TableCell>
-                            <Switch
-                              checked={product.verified}
-                              onCheckedChange={(checked) =>
-                                handleVerifyProduct(product.id, checked)
-                              }
-                              disabled={loadingStates[`verify-${product.id}`]}
-                            />
-                          </TableCell>
-                        )}
-                        <TableCell>{renderProductActions(product)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Pending Products Tab */}
-          <TabsContent value="pending">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Pending Approval</CardTitle>
-                  <CardDescription>
-                    Review and approve new product listings
-                  </CardDescription>
-                </div>
-                <Badge variant="destructive">
-                  {pendingProducts.length} Pending
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Image</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Seller</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      {permissions.canApproveProducts && (
-                        <TableHead>Actions</TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <Avatar className="h-12 w-12 border rounded-md">
-                            <AvatarImage
-                              src={product.images?.[0] || product.image}
-                              alt={product.name}
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="bg-yellow-100 text-yellow-600 rounded-md">
-                              {product.name?.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 border hidden">
-                              <AvatarFallback className="bg-yellow-100 text-yellow-600">
-                                {product.name?.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {product.description?.substring(0, 50)}...
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          <div className="flex flex-col">
-                            <span>KES {product.price?.toLocaleString()}</span>
-
-                          </div>
-                        </TableCell>
-                        <TableCell>{product.seller_email}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {product.category_name || "Uncategorized"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(product.created_at).toLocaleDateString()}
-                        </TableCell>
-                        {permissions.canApproveProducts && (
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleApproveProduct(product.id)}
-                                disabled={
-                                  loadingStates[`approve-${product.id}`]
-                                }
-                              >
-                                {loadingStates[`approve-${product.id}`] ? (
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                ) : (
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                )}
-                                Approve
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setProductToReject(product.id);
-                                  setShowRejectDialog(true);
-                                }}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                Reject
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Users Tab */}
-          <TabsContent value="users">
-            {permissions.canViewUsers ? (
-              renderUserManagement()
             ) : (
-              <Alert>
-                <AlertDescription>
-                  You don't have permission to view user management. Contact an
-                  administrator.
-                </AlertDescription>
-              </Alert>
+              <div className="admin-glass p-12 rounded-2xl border border-white/5 text-center">
+                <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h3>
+                <p className="text-slate-500">Inventory clearance required for this terminal. Seek authorization.</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Pending Verification Tab */}
+          <TabsContent value="pending" className="animate-in fade-in duration-500">
+            {permissions.canApproveProducts ? (
+              <Card className="admin-glass border-none shadow-2xl">
+                <CardHeader className="flex flex-row items-center justify-between pb-6">
+                  <div>
+                    <CardTitle className="text-slate-900 text-xl">Verification Queue</CardTitle>
+                    <CardDescription className="text-slate-500">High-priority listings awaiting security clearance</CardDescription>
+                  </div>
+                  {pendingProducts.length > 0 && (
+                    <Badge className="bg-rose-500 text-white border-none px-4 py-1.5 font-bold text-xs uppercase animate-pulse">
+                      {pendingProducts.length} Pending Approval
+                    </Badge>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow className="border-slate-100 hover:bg-transparent">
+                          <TableHead className="text-slate-500 pl-6 whitespace-nowrap">Unit</TableHead>
+                          <TableHead className="text-slate-500 whitespace-nowrap">Source Provider</TableHead>
+                          <TableHead className="text-slate-500 text-center whitespace-nowrap">Value</TableHead>
+                          <TableHead className="text-slate-500 text-center whitespace-nowrap">Protocol</TableHead>
+                          <TableHead className="text-slate-500 whitespace-nowrap">Sync Time</TableHead>
+                          <TableHead className="text-slate-500 text-right pr-6 whitespace-nowrap">Authorization</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingProducts.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-24">
+                              <div className="flex flex-col items-center gap-4">
+                                <div className="p-4 bg-slate-100 rounded-full">
+                                  <CheckCircle className="h-12 w-12 text-emerald-500 opacity-20" />
+                                </div>
+                                <p className="text-slate-400 font-medium">Queue is empty. Operational integrity at 100%.</p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          pendingProducts.map((product) => (
+                            <TableRow key={product.id} className="border-slate-100 hover:bg-slate-50 transition-colors group">
+                              <TableCell className="pl-6 whitespace-nowrap">
+                                <div className="flex items-center gap-4">
+                                  {product.images?.[0] ? (
+                                    <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-slate-200 group-hover:border-violet-500/50 transition-colors">
+                                      <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                      <Package className="h-6 w-6 text-slate-300" />
+                                    </div>
+                                  )}
+                                  <div className="space-y-1">
+                                    <p className="font-bold text-slate-900 text-sm line-clamp-1">{product.name}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">SKU: {product.id.slice(0, 8)}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                <p className="text-xs text-slate-600 font-medium">{product.seller_email}</p>
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                <p className="text-sm font-bold text-violet-600 font-mono">KES {product.price?.toLocaleString()}</p>
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                <Badge variant="outline" className="bg-rose-50 text-rose-600 border-none text-[10px] font-black uppercase">
+                                  Awaiting Sync
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-slate-400 font-medium whitespace-nowrap">
+                                {new Date(product.created_at).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right pr-6 whitespace-nowrap">
+                                {renderProductActions(product)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="admin-glass p-12 rounded-2xl border border-white/5 text-center">
+                <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h3>
+                <p className="text-slate-500">Security clearance insufficient for pending list. Raise request with Super-Admin.</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* User Management Tab */}
+          <TabsContent value="users" className="animate-in fade-in duration-500">
+            {permissions.canViewUsers ? (
+              <UserManagement 
+                users={users}
+                selectedUsers={selectedUsers}
+                setSelectedUsers={setSelectedUsers}
+                onViewUser={(user) => {
+                  setSelectedUser(user);
+                  setShowUserDialog(true);
+                }}
+                onBanUser={(id) => {
+                  setUserToBan(id);
+                  setShowBanDialog(true);
+                }}
+                onSuspendUser={(id) => {
+                  setUserToSuspend(id);
+                  setShowSuspendDialog(true);
+                }}
+                onUnbanUser={handleUnbanUser}
+                permissions={permissions}
+                loadingStates={loadingStates}
+              />
+            ) : (
+                <div className="admin-glass p-12 rounded-2xl border border-white/5 text-center">
+                   <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+                   <h3 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h3>
+                   <p className="text-slate-500">You don't have permission to view user management. Contact a super administrator for clearance.</p>
+                </div>
             )}
           </TabsContent>
 
           {/* Categories Tab */}
-          <TabsContent value="categories">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+          <TabsContent value="categories" className="animate-in fade-in duration-500">
+            <Card className="admin-glass border-none shadow-2xl">
+              <CardHeader className="flex flex-row items-center justify-between pb-6">
                 <div>
-                  <CardTitle>Category Management</CardTitle>
-                  <CardDescription>Organize product categories</CardDescription>
+                  <CardTitle className="text-slate-900 text-xl">Taxonomy Control</CardTitle>
+                  <CardDescription className="text-slate-500">Architectural hierarchy of platform categories</CardDescription>
                 </div>
                 {permissions.canManageCategories && (
-                  <Button onClick={() => {
-                    setPropertyEditorState([]);
-                    setNewCategory({ ...newCategory, properties: "{}" });
-                    setShowCategoryDialog(true);
-                  }}>
+                  <Button 
+                    onClick={() => {
+                      setPropertyEditorState([]);
+                      setNewCategory({ ...newCategory, properties: "{}" });
+                      setShowCategoryDialog(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg border-none"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Category
+                    New Dimension
                   </Button>
                 )}
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Products</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      {permissions.canManageCategories && (
-                        <TableHead>Actions</TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCategories.map((category) => (
-                      <TableRow key={category.id}>
-                        <TableCell className="font-medium">
-                          {category.name}
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-sm text-muted-foreground max-w-[200px] truncate">
-                            {category.description || "No description"}
-                          </p>
-                        </TableCell>
-                        <TableCell>{category.product_count || 0}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              category.is_active ? "default" : "secondary"
-                            }
-                          >
-                            {category.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(category.created_at).toLocaleDateString()}
-                        </TableCell>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow className="border-slate-100 hover:bg-transparent">
+                        <TableHead className="text-slate-500 pl-6 whitespace-nowrap">Dimension</TableHead>
+                        <TableHead className="text-slate-500 whitespace-nowrap">Definition</TableHead>
+                        <TableHead className="text-slate-500 text-center whitespace-nowrap">Volume</TableHead>
+                        <TableHead className="text-slate-500 text-center whitespace-nowrap">Protocol</TableHead>
+                        <TableHead className="text-slate-500 whitespace-nowrap">Sequence</TableHead>
                         {permissions.canManageCategories && (
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingCategory(category);
-                                  // Parse properties safely
-                                  let initialProps = [];
-                                  try {
-                                    const parsed = typeof category.properties === 'string'
-                                      ? JSON.parse(category.properties)
-                                      : category.properties;
-                                    initialProps = Object.entries(parsed || {}).map(([key, value]) => ({
-                                      key,
-                                      value: String(value)
-                                    }));
-                                  } catch (e) {
-                                    console.error("Error parsing props", e);
-                                  }
-                                  setPropertyEditorState(initialProps);
-                                  setShowEditCategoryDialog(true);
-                                }}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() =>
-                                  handleDeleteCategory(category.id)
-                                }
-                                disabled={
-                                  loadingStates[
-                                  `delete-category-${category.id}`
-                                  ]
-                                }
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                          <TableHead className="text-slate-500 text-right pr-6 whitespace-nowrap">Management</TableHead>
                         )}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCategories.map((category) => (
+                        <TableRow key={category.id} className="border-slate-100 hover:bg-slate-50 transition-colors">
+                          <TableCell className="font-bold text-slate-900 pl-6 whitespace-nowrap">
+                            {category.name}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <p className="text-xs text-slate-500 max-w-[200px] truncate">
+                              {category.description || "System default description"}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-center font-mono text-violet-600 whitespace-nowrap">
+                            {category.product_count || 0}
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap">
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full px-3 py-0.5 text-[10px] uppercase font-black border-none ${
+                                category.is_active 
+                                  ? "bg-emerald-50 text-emerald-600" 
+                                  : "bg-slate-50 text-slate-400"
+                              }`}
+                            >
+                              {category.is_active ? "Operational" : "Offline"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-400 whitespace-nowrap">
+                            {new Date(category.created_at).toLocaleDateString()}
+                          </TableCell>
+                          {permissions.canManageCategories && (
+                            <TableCell className="text-right pr-6 whitespace-nowrap">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingCategory(category);
+                                    let initialProps = [];
+                                    try {
+                                      const parsed = typeof category.properties === 'string'
+                                        ? JSON.parse(category.properties)
+                                        : category.properties;
+                                      initialProps = Object.entries(parsed || {}).map(([key, value]) => ({
+                                        key,
+                                        value: String(value)
+                                      }));
+                                    } catch (e) {
+                                      console.error("Error parsing props", e);
+                                    }
+                                    setPropertyEditorState(initialProps);
+                                    setShowEditCategoryDialog(true);
+                                  }}
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteCategory(category.id)}
+                                  disabled={loadingStates[`delete-category-${category.id}`]}
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="banners">
-            <AdminBannerManager
-              currentAdmin={currentAdmin}
-              permissions={permissions}
-            />
+
+          <TabsContent value="banners" className="animate-in fade-in duration-500">
+            {permissions.canViewBanners ? (
+              <div className="admin-glass p-8 rounded-2xl border border-white/5">
+              <AdminBannerManager
+                currentAdmin={currentAdmin}
+                permissions={permissions}
+              />
+            </div>
+            ) : (
+              <div className="bg-white/80 p-12 rounded-2xl border border-slate-200 text-center shadow-xl backdrop-blur-md">
+                <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h3>
+                <p className="text-slate-500">Broadcasting permission denied.</p>
+              </div>
+            )}
           </TabsContent>
 
           {/* Reports Tab */}
-          <TabsContent value="reports">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+          <TabsContent value="reports" className="animate-in fade-in duration-500">
+            <Card className="admin-glass border-none shadow-2xl">
+              <CardHeader className="flex flex-row items-center justify-between pb-6">
                 <div>
-                  <CardTitle>Report Management</CardTitle>
-                  <CardDescription>
-                    Review and resolve user reports
-                  </CardDescription>
+                  <CardTitle className="text-slate-900 text-xl">Integrity Monitoring</CardTitle>
+                  <CardDescription className="text-slate-500">High-priority user reports and policy violations</CardDescription>
                 </div>
                 <Badge
-                  variant={
-                    pendingReports.length > 0 ? "destructive" : "default"
-                  }
+                  className={`rounded-full px-4 py-1 text-xs font-black uppercase tracking-widest ${
+                    pendingReports.length > 0 ? "bg-rose-600 text-white animate-pulse" : "bg-emerald-50 text-emerald-600"
+                  }`}
                 >
-                  {pendingReports.length} Pending
+                  {pendingReports.length} Critical Events
                 </Badge>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Reporter</TableHead>
-                      <TableHead>Reason</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Reported</TableHead>
-                      {permissions.canResolveReports && (
-                        <TableHead>Actions</TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredReports.map((report) => (
-                      <TableRow key={report.id} className="hover:bg-muted/50">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {/* Product Thumbnail */}
-                            {report.product_images?.[0] ? (
-                              <div className="relative h-12 w-12 rounded-lg overflow-hidden border">
-                                <img
-                                  src={report.product_images[0]}
-                                  alt={report.product_name || "Product"}
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                    const parent =
-                                      e.currentTarget.parentElement;
-                                    if (parent) {
-                                      parent.innerHTML = `
-                              <div class="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                                <Package className="h-6 w-6 text-gray-400" />
-                              </div>
-                            `;
-                                    }
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                                <Package className="h-6 w-6 text-gray-400" />
-                              </div>
-                            )}
-                            <div className="space-y-1">
-                              <p className="font-medium text-sm">
-                                {report.product_name || "Unknown Product"}
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                {report.product_price && (
-                                  <div className="flex flex-col gap-0.5">
-                                    <Badge variant="outline" className="text-xs">
-                                      KES {report.product_price.toLocaleString()}
-                                    </Badge>
-
-                                  </div>
-                                )}
-                                {report.product_category_name && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {report.product_category_name}
-                                  </Badge>
-                                )}
-                                {report.product_verified && (
-                                  <Badge className="text-xs bg-green-500">
-                                    Verified
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              {report.reporter_avatar ? (
-                                <AvatarImage src={report.reporter_avatar} />
-                              ) : (
-                                <AvatarFallback className="text-xs">
-                                  {report.reporter_email
-                                    ?.charAt(0)
-                                    .toUpperCase()}
-                                </AvatarFallback>
-                              )}
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">
-                                {report.reporter_email}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {report.reporter_name || "Anonymous"}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-medium">
-                            {report.reason}
-                          </span>
-                          {report.description && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate max-w-[200px]">
-                              {report.description}
-                            </p>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              report.priority === "high"
-                                ? "destructive"
-                                : report.priority === "medium"
-                                  ? "default"
-                                  : "secondary"
-                            }
-                          >
-                            {report.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              report.status === "pending"
-                                ? "destructive"
-                                : "default"
-                            }
-                          >
-                            {report.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-xs space-y-1">
-                            <p>
-                              {new Date(report.created_at).toLocaleDateString()}
-                            </p>
-                            <p className="text-muted-foreground">
-                              {new Date(report.created_at).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
-                            </p>
-                          </div>
-                        </TableCell>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow className="border-slate-100 hover:bg-transparent">
+                        <TableHead className="text-slate-500 pl-6 whitespace-nowrap">Subject</TableHead>
+                        <TableHead className="text-slate-500 whitespace-nowrap">Source</TableHead>
+                        <TableHead className="text-slate-500 whitespace-nowrap">Violation</TableHead>
+                        <TableHead className="text-slate-500 text-center whitespace-nowrap">Priority</TableHead>
+                        <TableHead className="text-slate-500 text-center whitespace-nowrap">Status</TableHead>
+                        <TableHead className="text-slate-500 whitespace-nowrap">Timestamp</TableHead>
                         {permissions.canResolveReports && (
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedReport(report);
-                                  setShowReportDialog(true);
-                                }}
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                Review
-                              </Button>
-                              {report.status === "pending" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleResolveReport(
-                                      report.id,
-                                      "dismissed",
-                                      "No action required"
-                                    )
-                                  }
-                                  disabled={
-                                    loadingStates[`resolve-${report.id}`]
-                                  }
-                                >
-                                  <X className="h-3 w-3 mr-1" />
-                                  Dismiss
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                          <TableHead className="text-slate-500 text-right pr-6 whitespace-nowrap">Resolution</TableHead>
                         )}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredReports.map((report) => (
+                        <TableRow key={report.id} className="border-slate-100 hover:bg-slate-50 transition-colors group">
+                          <TableCell className="pl-6 whitespace-nowrap">
+                            <div className="flex items-center gap-4">
+                              {report.product_images?.[0] ? (
+                                <div className="relative h-11 w-11 rounded-xl overflow-hidden border border-slate-200 group-hover:border-violet-500/50 transition-colors">
+                                  <img
+                                    src={report.product_images[0]}
+                                    alt={report.product_name || "Product"}
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="h-11 w-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                  <Package className="h-5 w-5 text-slate-300" />
+                                </div>
+                              )}
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-slate-900 text-sm">
+                                  {report.product_name || "Unidentified Unit"}
+                                </p>
+                                {report.product_price && (
+                                  <p className="text-[10px] text-violet-600 font-mono font-bold tracking-tight">
+                                    KES {report.product_price.toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8 border border-slate-200">
+                                {report.reporter_avatar ? (
+                                  <AvatarImage src={report.reporter_avatar} />
+                                ) : (
+                                  <AvatarFallback className="text-[10px] bg-slate-100 text-slate-600">
+                                    {report.reporter_email?.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                )}
+                              </Avatar>
+                              <p className="text-xs text-slate-600 font-medium">
+                                {report.reporter_email}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <span className="text-xs font-bold text-slate-900 uppercase tracking-tighter">
+                              {report.reason}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap">
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase border-none ${
+                                 report.priority === "high"
+                                  ? "bg-rose-600 text-white"
+                                  : report.priority === "medium"
+                                    ? "bg-amber-50 text-amber-600"
+                                    : "bg-blue-50 text-blue-600"
+                              }`}
+                            >
+                              {report.priority}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap">
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                               report.status === "pending" ? "text-rose-600 bg-rose-50" : "text-emerald-600 bg-emerald-50"
+                            }`}>
+                              <div className={`w-1.5 h-1.5 rounded-full ${report.status === "pending" ? "bg-rose-600 animate-pulse" : "bg-emerald-600"}`} />
+                              {report.status}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                            {new Date(report.created_at).toLocaleString()}
+                          </TableCell>
+                          {permissions.canResolveReports && (
+                            <TableCell className="text-right pr-6 whitespace-nowrap">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedReport(report);
+                                    setShowReportDialog(true);
+                                  }}
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {report.status === "pending" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleResolveReport(report.id, "dismissed", "Manual dismissal")}
+                                    disabled={loadingStates[`resolve-${report.id}`]}
+                                    className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Subscriptions Tab */}
-          <TabsContent value="subscriptions">
+          <TabsContent value="subscriptions" className="animate-in fade-in duration-500">
             {permissions.canViewSubscriptions ? (
-              <Tabs defaultValue="plans" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="plans">Active Plans</TabsTrigger>
-                  <TabsTrigger value="history">Transaction History</TabsTrigger>
-                </TabsList>
+              <div className="space-y-8">
+                <div className="bg-white/80 p-2 rounded-2xl border border-slate-200 shadow-sm w-fit backdrop-blur-md">
+                  <Tabs defaultValue="plans" className="w-full">
+                    <TabsList className="bg-slate-100 rounded-xl h-auto p-1 gap-1">
+                      <TabsTrigger value="plans" className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest data-[state=active]:bg-violet-600 data-[state=active]:text-white text-slate-500 hover:text-slate-900 shadow-sm transition-all">Active Ecosystem</TabsTrigger>
+                      <TabsTrigger value="history" className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest data-[state=active]:bg-violet-600 data-[state=active]:text-white text-slate-500 hover:text-slate-900 shadow-sm transition-all">Financial Sequence</TabsTrigger>
+                    </TabsList>
 
-                <TabsContent value="plans">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                          <CardTitle>Subscription Management</CardTitle>
-                          <CardDescription>
-                            Manage user subscriptions and plans - All statuses shown
-                          </CardDescription>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Select value={subscriptionStatusFilter} onValueChange={setSubscriptionStatusFilter}>
-                            <SelectTrigger className="w-full sm:w-[180px]">
-                              <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Statuses</SelectItem>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                              <SelectItem value="expired">Expired</SelectItem>
-                              <SelectItem value="failed">Failed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              placeholder="Search subscriptions..."
-                              value={subscriptionSearchTerm}
-                              onChange={(e) => setSubscriptionSearchTerm(e.target.value)}
-                              className="pl-8 w-full sm:w-[250px]"
-                            />
+                    <TabsContent value="plans" className="mt-8 space-y-8">
+                      <Card className="admin-glass border-none shadow-2xl">
+                        <CardHeader className="pb-6">
+                           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                            <div>
+                              <CardTitle className="text-slate-900 text-xl font-bold">Revenue Flow Management</CardTitle>
+                              <CardDescription className="text-slate-500">Supervision of platform subscription clusters</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <Select value={subscriptionStatusFilter} onValueChange={setSubscriptionStatusFilter}>
+                                <SelectTrigger className="w-48 bg-white border-slate-200 text-slate-900 rounded-xl h-11 shadow-sm">
+                                  <SelectValue placeholder="Protocol Status" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
+                                  <SelectItem value="all">Unified View</SelectItem>
+                                  <SelectItem value="active">Operational</SelectItem>
+                                  <SelectItem value="pending">Syncing</SelectItem>
+                                  <SelectItem value="failed">Interrupted</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <Input
+                                  placeholder="Sequence ID..."
+                                  value={subscriptionSearchTerm}
+                                  onChange={(e) => setSubscriptionSearchTerm(e.target.value)}
+                                  className="pl-12 w-64 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl h-11 shadow-sm"
+                                />
+                              </div>
+                            </div>
+                           </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader className="bg-slate-50">
+                                <TableRow className="border-slate-100 hover:bg-transparent">
+                                  <TableHead className="text-slate-500 pl-6 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Member</TableHead>
+                                  <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Tier</TableHead>
+                                  <TableHead className="text-slate-500 text-center font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Status</TableHead>
+                                  <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Reference</TableHead>
+                                  <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Revenue</TableHead>
+                                  <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Expiry</TableHead>
+                                  {permissions.canManageSubscriptions && (
+                                    <TableHead className="text-slate-500 text-right pr-6 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Override</TableHead>
+                                  )}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredSubscriptions.map((subscription) => (
+                                  <TableRow key={subscription.id} className="border-slate-100 hover:bg-slate-50 transition-colors">
+                                    <TableCell className="pl-6 whitespace-nowrap">
+                                      <div className="flex items-center gap-3">
+                                        <Avatar className="h-8 w-8 border border-slate-100 shadow-sm">
+                                          <AvatarFallback className="text-[10px] bg-blue-50 text-blue-600 font-bold">
+                                            {subscription.user_email?.charAt(0).toUpperCase()}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                          <p className="text-sm font-bold text-slate-900">{subscription.user_email}</p>
+                                          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{subscription.user_name}</p>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-600 border-none font-black text-[10px] uppercase">
+                                        {subscription.plan_name}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center whitespace-nowrap">
+                                      <Badge className={`rounded-full px-3 py-0.5 text-[10px] font-black uppercase border-none ${
+                                        subscription.status === "active" ? "bg-emerald-500 text-white" : "bg-rose-50 text-rose-600"
+                                      }`}>
+                                        {subscription.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="font-mono text-[10px] text-slate-400 whitespace-nowrap">
+                                      {subscription.mpesa_receipt_number || "Internal Sync"}
+                                    </TableCell>
+                                    <TableCell className="font-bold text-slate-900 whitespace-nowrap">
+                                      KES {subscription.price_monthly?.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
+                                      {new Date(subscription.current_period_end).toLocaleDateString()}
+                                    </TableCell>
+                                    {permissions.canManageSubscriptions && (
+                                      <TableCell className="text-right pr-6 whitespace-nowrap">
+                                        <div className="flex justify-end gap-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setTransactionDetailsSubscription(subscription);
+                                              setShowSubscriptionTransactionsDialog(true);
+                                            }}
+                                            className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setSelectedSubscription(subscription);
+                                              setAdjustmentData({
+                                                uploadLimit: 0,
+                                                status: subscription.status,
+                                                notes: ""
+                                              });
+                                              setShowAdjustSubscriptionDialog(true);
+                                            }}
+                                            className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                          >
+                                            <Settings className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    )}
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-4">
-                        <Badge variant="outline">{filteredSubscriptions.length} Total</Badge>
-                        <Badge variant="default">{filteredSubscriptions.filter(s => s.status === 'active').length} Active</Badge>
-                        <Badge variant="destructive">{filteredSubscriptions.filter(s => s.status === 'failed').length} Failed</Badge>
-                        <Badge variant="secondary">{filteredSubscriptions.filter(s => s.status === 'cancelled').length} Cancelled</Badge>
-                      </div>
-                      {permissions.canManageSubscriptions && (
-                        <div className="flex gap-2 mt-4 p-3 bg-muted/50 rounded-lg">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium mb-1">System Repair Tools</p>
-                            <p className="text-xs text-muted-foreground">Fix subscription issues when automated systems fail</p>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="history" className="mt-8">
+                       <Card className="admin-glass border-none shadow-2xl">
+                        <CardHeader className="pb-6">
+                          <div className="flex justify-between items-center">
+                            <CardTitle className="text-slate-900 text-xl font-bold">Transaction Sequence</CardTitle>
+                            <div className="relative">
+                              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                              <Input
+                                placeholder="Trace Reference..."
+                                value={transactionSearchTerm}
+                                onChange={(e) => setTransactionSearchTerm(e.target.value)}
+                                className="pl-12 w-80 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl h-11 shadow-sm"
+                              />
+                            </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRecalculateAllLimits}
-                            disabled={loadingStates["recalculate-all"]}
-                          >
-                            {loadingStates["recalculate-all"] ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Recalculating...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="h-4 w-4 mr-2" />
-                                Recalculate All Limits
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>User</TableHead>
-                            <TableHead>Plan</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Reference</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead>Renews</TableHead>
-                            <TableHead>Created</TableHead>
-                            {permissions.canManageSubscriptions && (
-                              <TableHead>Actions</TableHead>
-                            )}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredSubscriptions.map((subscription) => (
-                            <TableRow key={subscription.id}>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Avatar className="h-6 w-6">
-                                    <AvatarFallback>
-                                      {subscription.user_email
-                                        ?.charAt(0)
-                                        .toUpperCase()}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <p className="text-sm font-medium">
-                                      {subscription.user_email}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {subscription.user_name}
-                                    </p>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">
-                                  {subscription.plan_name}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    subscription.status === "active"
-                                      ? "default"
-                                      : subscription.status === "failed"
-                                        ? "destructive"
-                                        : "secondary"
-                                  }
-                                >
-                                  {subscription.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-xs font-mono bg-muted p-1 rounded">
-                                  {subscription.mpesa_receipt_number || subscription.payment_method || '-'}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span>KES {subscription.price_monthly?.toLocaleString()}</span>
-
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {new Date(
-                                  subscription.current_period_end
-                                ).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell>
-                                {new Date(
-                                  subscription.created_at
-                                ).toLocaleDateString()}
-                              </TableCell>
-                              {permissions.canManageSubscriptions && (
-                                <TableCell>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setTransactionDetailsSubscription(subscription);
-                                        setShowSubscriptionTransactionsDialog(true);
-                                      }}
-                                    >
-                                      <Eye className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleSyncSubscriptionStatus(subscription.id)}
-                                      disabled={loadingStates[`sync-${subscription.id}`]}
-                                      title="Sync upload limit to plan"
-                                    >
-                                      {loadingStates[`sync-${subscription.id}`] ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <RefreshCw className="h-3 w-3" />
-                                      )}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedSubscription(subscription);
-                                        setAdjustmentData({
-                                          uploadLimit: 0,
-                                          status: subscription.status,
-                                          notes: ""
-                                        });
-                                        setShowAdjustSubscriptionDialog(true);
-                                      }}
-                                    >
-                                      <Settings className="h-3 w-3 mr-1" />
-                                      Adjust
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="history">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                          <CardTitle>Transaction History</CardTitle>
-                          <CardDescription>
-                            Real-time payment logs (Success, Failed, Pending)
-                          </CardDescription>
-                        </div>
-                        <div className="relative">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Search transactions..."
-                            value={transactionSearchTerm}
-                            onChange={(e) => setTransactionSearchTerm(e.target.value)}
-                            className="pl-8 w-full sm:w-[250px]"
-                          />
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>User</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>M-Pesa Receipt</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Date</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredTransactions.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                                No transactions found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredTransactions.map((tx) => (
-                              <TableRow key={tx.id}>
-                                <TableCell>
-                                  <div>
-                                    <p className="text-sm font-medium">{tx.user_email}</p>
-                                    <p className="text-xs text-muted-foreground">{tx.user_name}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  KES {tx.amount.toLocaleString()}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={
-                                      tx.status === "completed" || tx.status === "success"
-                                        ? "default"
-                                        : tx.status === "failed"
-                                          ? "destructive"
-                                          : "secondary"
-                                    }
-                                  >
-                                    {tx.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {tx.mpesa_receipt_number || "N/A"}
-                                </TableCell>
-                                <TableCell className="capitalize">
-                                  {tx.payment_method}
-                                </TableCell>
-                                <TableCell className="max-w-[200px] truncate" title={tx.description}>
-                                  {tx.description}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  {new Date(tx.created_at).toLocaleString()}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                           <div className="overflow-x-auto">
+                             <Table>
+                               <TableHeader className="bg-slate-50">
+                                 <TableRow className="border-slate-100 hover:bg-transparent">
+                                   <TableHead className="text-slate-500 pl-6 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Unit</TableHead>
+                                   <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Volume</TableHead>
+                                   <TableHead className="text-slate-500 text-center font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Outcome</TableHead>
+                                   <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Sequence ID</TableHead>
+                                   <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Protocol</TableHead>
+                                   <TableHead className="text-slate-500 font-bold text-[10px] uppercase tracking-widest whitespace-nowrap">Timestamp</TableHead>
+                                 </TableRow>
+                               </TableHeader>
+                               <TableBody>
+                                 {filteredTransactions.map((tx) => (
+                                   <TableRow key={tx.id} className="border-slate-100 hover:bg-slate-50 transition-colors">
+                                     <TableCell className="pl-6 font-bold text-slate-900 whitespace-nowrap">{tx.user_email}</TableCell>
+                                     <TableCell className="font-black text-emerald-600 font-mono whitespace-nowrap">KES {tx.amount.toLocaleString()}</TableCell>
+                                     <TableCell className="text-center whitespace-nowrap">
+                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                                          tx.status === "completed" || tx.status === "success" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                                        }`}>
+                                          <div className={`w-1.5 h-1.5 rounded-full ${tx.status === "completed" || tx.status === "success" ? "bg-emerald-600" : "bg-rose-600 animate-pulse"}`} />
+                                          {tx.status}
+                                        </div>
+                                     </TableCell>
+                                     <TableCell className="font-mono text-[10px] text-slate-400 font-medium whitespace-nowrap">{tx.mpesa_receipt_number || "Internal"}</TableCell>
+                                     <TableCell className="text-[10px] uppercase font-black text-slate-400 tracking-wider text-center whitespace-nowrap">{tx.payment_method}</TableCell>
+                                     <TableCell className="text-[10px] font-bold text-slate-300 whitespace-nowrap">{new Date(tx.created_at).toLocaleString()}</TableCell>
+                                   </TableRow>
+                                 ))}
+                               </TableBody>
+                             </Table>
+                           </div>
+                        </CardContent>
+                       </Card>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </div>
             ) : (
-              <Alert>
-                <AlertDescription>
-                  You don't have permission to view subscriptions. Contact an
-                  administrator.
-                </AlertDescription>
-              </Alert>
+              <div className="bg-white/80 p-12 rounded-2xl border border-slate-200 text-center shadow-xl backdrop-blur-md">
+                  <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h3>
+                  <p className="text-slate-500">Security clearance insufficient for financial logs. Raise request with Super-Admin.</p>
+               </div>
             )}
           </TabsContent>
 
           {/* Withdrawals Tab */}
-          <TabsContent value="withdrawals">
-            <Card>
-              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle>Withdrawal Management</CardTitle>
-                  <CardDescription>
-                    Process manual payout requests from referrers
-                  </CardDescription>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 items-center">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search withdrawals..."
-                      value={withdrawalSearchTerm}
-                      onChange={(e) => setWithdrawalSearchTerm(e.target.value)}
-                      className="pl-8 w-full sm:w-[250px]"
-                    />
-                  </div>
-                  <Badge variant="outline">
-                    {withdrawals.filter(w => w.status === 'pending' || w.status === 'processing').length} Pending Requests
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Payment Method</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Requested</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredWithdrawals.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                          No withdrawals found matching your search
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredWithdrawals.map((w) => (
-                        <TableRow key={w.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{w.profiles?.full_name || "N/A"}</p>
-                              <p className="text-sm text-muted-foreground">{w.profiles?.email}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-bold">
-                            <div className="flex flex-col">
-                              <span>KES {w.amount.toLocaleString()}</span>
-
-                            </div>
-                          </TableCell>
-                          <TableCell className="capitalize">
-                            {w.payment_method}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={
-                              w.status === 'completed' ? 'default' :
-                                w.status === 'cancelled' ? 'destructive' :
-                                  'secondary'
-                            }>
-                              {w.status.toUpperCase()}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(w.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            {(w.status === 'pending' || w.status === 'processing') && (
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleUpdateWithdrawalStatus(w.id, 'completed', 'Paid via M-Pesa')}
-                                  disabled={loadingStates[`withdrawal-${w.id}`]}
-                                >
-                                  {loadingStates[`withdrawal-${w.id}`] ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                                  )}
-                                  Paid
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const reason = window.prompt("Reason for cancellation?");
-                                    if (reason) handleUpdateWithdrawalStatus(w.id, 'cancelled', reason);
-                                  }}
-                                  disabled={loadingStates[`withdrawal-${w.id}`]}
-                                >
-                                  <X className="h-4 w-4 mr-1" />
-                                  Cancel
-                                </Button>
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+          <TabsContent value="withdrawals" className="space-y-6 animate-in fade-in duration-500 scroll-mt-32">
+            <AdminWallets />
           </TabsContent>
 
           {/* Admins Tab */}
-          <TabsContent value="admins">{renderAdminManagement()}</TabsContent>
+          <TabsContent value="admins" className="animate-in fade-in duration-500 scroll-mt-32">{renderAdminManagement()}</TabsContent>
 
           {/* Analytics Tab */}
-          <TabsContent value="analytics">
-            {permissions.canViewAnalytics ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5" />
-                        User Analytics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            New Registrations
-                          </span>
-                          <Badge variant="default">
-                            +{stats.todayRegistrations} today
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Active Sellers
-                          </span>
-                          <span className="text-sm font-bold">
-                            {Math.round(
-                              (stats.userEngagement / 100) * stats.totalUsers
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Growth Rate
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {stats.weeklyGrowth > 0 ? (
-                              <ArrowUpRight className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <ArrowDownRight className="h-4 w-4 text-red-500" />
-                            )}
-                            <span
-                              className={`text-sm font-bold ${stats.weeklyGrowth > 0
-                                ? "text-green-500"
-                                : "text-red-500"
-                                }`}
-                            >
-                              {stats.weeklyGrowth}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Product Analytics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Total Products
-                          </span>
-                          <span className="text-sm font-bold">
-                            {stats.totalProducts}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Approval Rate
-                          </span>
-                          <span className="text-sm font-bold">
-                            {stats.totalProducts > 0
-                              ? Math.round(
-                                (stats.approvedProducts /
-                                  stats.totalProducts) *
-                                100
-                              )
-                              : 0}
-                            %
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Featured Products
-                          </span>
-                          <span className="text-sm font-bold">
-                            {stats.featuredProducts}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5" />
-                        Revenue Analytics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Total Revenue
-                          </span>
-                          <span className="text-sm font-bold flex flex-col items-end">
-                            <span>KES {stats.totalRevenue.toLocaleString()}</span>
-
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Active Subscriptions
-                          </span>
-                          <span className="text-sm font-bold">
-                            {stats.activeSubscriptions}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">
-                            Conversion Rate
-                          </span>
-                          <span className="text-sm font-bold">
-                            {stats.totalProducts > 0
-                              ? Math.round(
-                                (stats.activeSubscriptions /
-                                  stats.totalUsers) *
-                                100
-                              )
-                              : 0}
-                            %
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Revenue Trends</CardTitle>
-                    <CardDescription>
-                      Weekly revenue and order performance
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80 flex items-center justify-center border rounded-lg bg-gradient-to-br from-slate-50 to-blue-50/30">
-                      <div className="text-center">
-                        <LineChart className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold mb-2">
-                          Revenue Analytics
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          Interactive charts showing platform performance
-                        </p>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div className="text-center">
-                            <p className="font-semibold">
-                              KES {stats.totalRevenue.toLocaleString()}
-                            </p>
-
-                            <p className="text-muted-foreground">
-                              Total Revenue
-                            </p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-semibold">
-                              {stats.weeklyGrowth}%
-                            </p>
-                            <p className="text-muted-foreground">
-                              Weekly Growth
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  You don't have permission to view analytics. Contact an
-                  administrator.
-                </AlertDescription>
-              </Alert>
-            )}
-          </TabsContent>
 
           {/* System Tab */}
-          <TabsContent value="system">
+          <TabsContent value="system" className="animate-in fade-in duration-500 scroll-mt-32">
             {permissions.canManageSystem ? (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -5695,7 +4987,7 @@ export default function UltimateAdminDashboard() {
           </TabsContent>
 
           {/* Security Tab (Audit Log) */}
-          <TabsContent value="security" className="space-y-6">
+          <TabsContent value="security" className="space-y-6 animate-in fade-in duration-500 scroll-mt-32">
             <Card>
               <CardHeader>
                 <CardTitle>Security Audit Logs</CardTitle>
@@ -5766,6 +5058,10 @@ export default function UltimateAdminDashboard() {
                 />
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="health" className="space-y-6 animate-in fade-in duration-500 scroll-mt-32">
+             <AdminSystemScan />
           </TabsContent>
         </Tabs>
 

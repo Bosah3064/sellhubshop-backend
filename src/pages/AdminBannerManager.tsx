@@ -53,8 +53,8 @@ interface Banner {
 }
 
 interface AdminBannerManagerProps {
-  currentAdmin: any;
-  permissions: any;
+  currentAdmin?: any;
+  permissions?: any;
 }
 
 // Component for individual banner card with image error handling
@@ -249,9 +249,11 @@ const BannerCard = ({
 };
 
 export function AdminBannerManager({
-  currentAdmin,
-  permissions,
+  currentAdmin: propAdmin,
+  permissions: propPermissions,
 }: AdminBannerManagerProps) {
+  const [currentAdmin, setCurrentAdmin] = useState(propAdmin);
+  const [permissions, setPermissions] = useState(propPermissions);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -279,8 +281,35 @@ export function AdminBannerManager({
   });
 
   useEffect(() => {
+    const fetchAdminData = async () => {
+      if (!currentAdmin || !permissions) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: admin } = await supabase
+              .from("admin_users")
+              .select("*")
+              .eq("user_id", user.id)
+              .single();
+            
+            if (admin) {
+              setCurrentAdmin(admin);
+              // Simple permission set for standalone mode
+              setPermissions({
+                canViewBanners: true,
+                canManageBanners: admin.role === 'admin' || admin.role === 'super_admin' || admin.can_manage_content
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching admin data in BannerManager:", error);
+        }
+      }
+    };
+
+    fetchAdminData();
     loadBanners();
-  }, []);
+  }, [propAdmin, propPermissions]);
 
   useEffect(() => {
     if (editingBanner) {

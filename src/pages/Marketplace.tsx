@@ -213,6 +213,7 @@ interface Product {
     rating: number | null;
     total_ratings: number | null;
     created_at: string;
+    updated_at?: string | null;
   } | null;
 }
 
@@ -236,6 +237,25 @@ export default function Marketplace() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState("All");
+
+  // Dynamic SEO Data
+  const getSEOData = () => {
+    if (selectedCategory === "All") {
+      return {
+        title: "Browse All Products | SellHub Marketplace",
+        description: "Explore the best deals in Kenya. Electronics, Fashion, Vehicles, Property and more. Verified sellers, secure payments.",
+        keywords: "marketplace kenya, buy online, sell online, shopping deals, classifieds kenya"
+      };
+    }
+    return {
+      title: `Buy & Sell ${selectedCategory} in Kenya | SellHub`,
+      description: `Find the best deals on ${selectedCategory} in Kenya. Shop from verified sellers on SellHub's premium marketplace.`,
+      keywords: `${selectedCategory.toLowerCase()} kenya, buy ${selectedCategory.toLowerCase()}, sell ${selectedCategory.toLowerCase()}, ${selectedCategory.toLowerCase()} prices kenya, best ${selectedCategory.toLowerCase()} deals`
+    };
+  };
+
+  const seoData = getSEOData();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const { addToCart } = useCart();
@@ -271,6 +291,8 @@ export default function Marketplace() {
   const [reportDetails, setReportDetails] = useState("");
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [counties, setCounties] = useState<{ id: string, name: string }[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);  
 
   // Simple contact tracking
   const [contactHistory, setContactHistory] = useState<ContactSession[]>([]);
@@ -287,7 +309,45 @@ export default function Marketplace() {
   const [productDetailModalOpen, setProductDetailModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isSlideshowPlaying, setIsSlideshowPlaying] = useState(false);
-  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  
+  // Helper to check online status (active within 10 minutes)
+  const isUserOnline = (updatedAt: string | null) => {
+    if (!updatedAt) return false;
+    const diffInMinutes = (new Date().getTime() - new Date(updatedAt).getTime()) / 60000;
+    return diffInMinutes < 10;
+  };
+
+  const getLastSeenText = (updatedAt: string | null) => {
+    if (!updatedAt) return "Offline";
+    const diffInMinutes = Math.floor((new Date().getTime() - new Date(updatedAt).getTime()) / 60000);
+    
+    if (diffInMinutes < 1) return "Online now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+  /* Logic exists below */
+  // Smart Search logic
+  useEffect(() => {
+    const saved = localStorage.getItem("recentSearches");
+    if (saved) {
+      setRecentSearches(JSON.parse(saved));
+    }
+  }, []);
+
+  const addRecentSearch = (term: string) => {
+    if (!term.trim()) return;
+    const newSearches = [term, ...recentSearches.filter(s => s !== term)].slice(0, 5);
+    setRecentSearches(newSearches);
+    localStorage.setItem("recentSearches", JSON.stringify(newSearches));
+  };
+  
+  const handleSearch = (term: string) => {
+    setSearchQuery(term);
+    addRecentSearch(term);
+    setShowRecentSearches(false);
+  };
 
   // Smart Search State
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -461,7 +521,9 @@ export default function Marketplace() {
           created_at,
           phone,
           whatsapp,
-          username
+          username,
+          updated_at
+        )
         )
       `
         )
@@ -472,7 +534,7 @@ export default function Marketplace() {
 
       // Apply Filters
       if (selectedCategory && selectedCategory !== "All") {
-        query = query.eq("category", selectedCategory);
+        query = query.ilike("category", selectedCategory);
       }
 
       // Price Range - Ensure we handle 0 correctly
@@ -1577,7 +1639,12 @@ export default function Marketplace() {
         }}
       />
 
-      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <SEO 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+      />
+      <div className="min-h-screen bg-slate-50 relative pb-20">
         {/* Simplified Header */}
         <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white py-4">
           <div className="container mx-auto px-4">
@@ -1628,9 +1695,54 @@ export default function Marketplace() {
                       className="pl-12 pr-4 py-6 text-lg border-2 border-gray-100/80 bg-gray-50/50 rounded-2xl focus-visible:ring-2 focus-visible:ring-primary/30 shadow-inner group-focus-within:border-primary/50 transition-all"
                     />
                   </div>
-                    {/* Smart Search Suggestions */}
-                    {isSearchActive && (searchQuery.length > 0 || trendingSearches.length > 0) && (
-                      <div className="absolute top-full left-0 right-0 mt-4 bg-white/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 z-50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+     {/* Smart Search Suggestions */}
+     {isSearchActive && (
+       <div className="absolute top-full left-0 right-0 mt-4 bg-white/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 z-50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+         
+         {/* Recent Searches */}
+         {recentSearches.length > 0 && !searchQuery && (
+            <div className="p-4 border-b border-gray-100/50">
+              <div className="flex items-center justify-between px-3 py-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Recent Searches</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-[10px] text-gray-400 hover:text-red-500"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    localStorage.removeItem("recentSearches");
+                    setRecentSearches([]);
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {recentSearches.map((term, i) => (
+                   <button
+                      key={i}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-xl flex items-center justify-between group transition-colors"
+                      onClick={() => handleSearch(term)}
+                   >
+                      <div className="flex items-center gap-3">
+                         <History className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
+                         <span className="text-sm font-medium text-gray-700">{term}</span>
+                      </div>
+                      <X
+                        className="h-4 w-4 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newSearches = recentSearches.filter(s => s !== term);
+                          setRecentSearches(newSearches);
+                          localStorage.setItem("recentSearches", JSON.stringify(newSearches));
+                        }}
+                      />
+                   </button>
+                ))}
+              </div>
+            </div>
+         )}
+
                         {searchQuery.length > 0 && searchSuggestions.length > 0 && (
                           <div className="p-4 border-b border-gray-100/50">
                             <p className="text-[10px] font-black text-gray-400 px-3 py-2 uppercase tracking-[0.2em]">Suggested Categories</p>
@@ -1853,10 +1965,6 @@ export default function Marketplace() {
                 selectedCategory={selectedCategory}
                 onCategoryChange={setSelectedCategory}
                 priceRange={priceRange}
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                priceRange={priceRange}
                 onPriceRangeChange={setPriceRange}
                 conditions={conditionFilter}
                 onConditionChange={(c) => {
@@ -2033,19 +2141,36 @@ export default function Marketplace() {
                                 />
                             </div>
                             <div className="flex flex-col items-end">
-                                <div className="flex items-center text-gray-500 text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {product.profiles?.avatar_url ? (
+                                    <div className="relative">
+                                      <Avatar className="h-6 w-6 border border-gray-100">
+                                        <AvatarImage src={product.profiles.avatar_url} alt={product.profiles.full_name || "Seller"} />
+                                        <AvatarFallback>{(product.profiles.full_name || "S").charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                      <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${isUserOnline(product.profiles.updated_at) ? "bg-green-500" : "bg-gray-300"}`}></span>
+                                    </div>
+                                  ) : (
+                                    <div className="relative">
+                                      <div className="h-6 w-6 rounded-full bg-gradient-to-r from-gray-100 to-gray-200 flex items-center justify-center border border-gray-100">
+                                        <User className="h-3.5 w-3.5 text-gray-500" />
+                                      </div>
+                                       <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${isUserOnline(product.profiles?.updated_at) ? "bg-green-500" : "bg-gray-300"}`}></span>
+                                    </div>
+                                  )}
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[10px] font-medium text-gray-700 max-w-[80px] truncate">
+                                      {product.profiles?.full_name || "Seller"}
+                                    </span>
+                                    <span className="text-[8px] text-gray-400">
+                                      {getLastSeenText(product.profiles?.updated_at)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center text-gray-500 text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg mt-1">
                                     <MapPin className="h-3 w-3 mr-1 text-secondary" />
                                     {product.location?.split(',')[0]}
                                 </div>
-                                {sellerRating && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                        <div className="flex gap-0.5">
-                                            {[...Array(5)].map((_, i) => (
-                                                <Star key={i} className={`h-2.5 w-2.5 ${i < Math.floor(sellerRating.rating) ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                           </div>
                           
@@ -2816,7 +2941,7 @@ export default function Marketplace() {
           </DialogContent>
         </Dialog>
         </div>
-      </main>
+      </div>
     </>
   );
 }

@@ -15,6 +15,7 @@ import {
   X,
   Sparkles,
 } from "lucide-react";
+import SEO from "@/components/SEO";
 
 // UI Components
 import {
@@ -180,19 +181,6 @@ export default function Pricing() {
 
   useEffect(() => {
     console.log("Pricing Component Mounted");
-    document.title = "Pricing Plans | SellHub Marketplace";
-
-    // Set page metadata
-    const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.setAttribute('content', 'Choose your perfect marketplace plan. Flexible pricing for sellers at all levels.');
-    }
-
-    const metaKeywords = document.querySelector('meta[name="keywords"]');
-      const keywords = document.createElement('meta');
-      keywords.name = 'keywords';
-      keywords.content = 'marketplace pricing, KES payment, subscription plans, seller plans';
-      document.head.appendChild(keywords);
   }, []);
 
   if (isLoading) {
@@ -207,6 +195,11 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950 via-slate-950 to-black text-slate-100 overflow-hidden">
+      <SEO 
+        title="Pricing Plans | SellHub Marketplace"
+        description="Choose your perfect marketplace plan. Flexible pricing for sellers at all levels. Scale your business with our Silver and Gold packages."
+        keywords="marketplace pricing, KES payment, subscription plans, seller plans, sellhub premium"
+      />
       {/* Ambient Background Effects */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/20 blur-[120px]" />

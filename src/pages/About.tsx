@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 import {
   Users,
   Shield,
@@ -9,8 +10,11 @@ import {
   Award,
   Heart,
   MapPin,
+  ArrowRight,
+  CheckCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import SEO from "@/components/SEO";
 
 export default function About() {
   const stats = [

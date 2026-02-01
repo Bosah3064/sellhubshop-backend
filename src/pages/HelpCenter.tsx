@@ -53,7 +53,7 @@ export default function HelpCenter() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-950">
       <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white py-20">
         <div className="container mx-auto px-4 text-center">
           <Badge className="mb-4 bg-white/20 text-white border-0 px-4 py-2">
@@ -75,7 +75,7 @@ export default function HelpCenter() {
                 placeholder="Search for help articles..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 py-6 text-lg text-gray-900 bg-white/95 border-0 focus-visible:ring-2 focus-visible:ring-white/20"
+                className="pl-12 py-6 text-lg text-gray-900 dark:text-gray-100 bg-white/95 dark:bg-slate-800/95 border-0 focus-visible:ring-2 focus-visible:ring-white/20"
               />
             </div>
           </div>
@@ -87,49 +87,49 @@ export default function HelpCenter() {
           {categories.map((category) => (
             <Card
               key={category.id}
-              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer dark:bg-slate-900 dark:border dark:border-slate-800"
             >
               <CardContent className="p-6 text-center">
                 <div
-                  className={`w-12 h-12 mx-auto mb-4 ${category.color} rounded-xl flex items-center justify-center`}
+                  className={`w-12 h-12 mx-auto mb-4 ${category.color} dark:bg-opacity-20 rounded-xl flex items-center justify-center`}
                 >
                   <BookOpen className="h-6 w-6" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-900">
+                <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">
                   {category.name}
                 </h3>
-                <p className="text-gray-600">{category.description}</p>
+                <p className="text-gray-600 dark:text-gray-400">{category.description}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
         <div className="mt-16">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">
             Popular Help Articles
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {popularArticles.map((article, index) => (
               <Card
                 key={index}
-                className="border-0 shadow-lg hover:shadow-xl transition-shadow"
+                className="border-0 shadow-lg hover:shadow-xl transition-shadow dark:bg-slate-900 dark:border dark:border-slate-800"
               >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-3">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs dark:text-gray-300 dark:border-slate-700">
                       {article.category}
                     </Badge>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {article.readTime}
                     </span>
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-3 hover:text-green-600 cursor-pointer">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-3 hover:text-green-600 cursor-pointer transition-colors">
                     {article.title}
                   </h3>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full justify-start text-green-600 hover:text-green-700 hover:bg-green-50"
+                    className="w-full justify-start text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10"
                   >
                     Read Article →
                   </Button>

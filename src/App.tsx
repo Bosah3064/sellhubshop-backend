@@ -56,9 +56,11 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const ProfileProducts = lazy(() => import("./pages/ProfileProducts"));
 const AdminBannerManager = lazy(() => import("./pages/AdminBannerManager"));
+const AdminWallets = lazy(() => import("./pages/AdminWallets"));
 const Cart = lazy(() => import("./pages/Cart"));
 const Wallet = lazy(() => import("./pages/Wallet"));
 const Checkout = lazy(() => import("./pages/Checkout"));
+import { ThemeProvider } from "next-themes";
 
 import { AdminSecurityGate as AdminSecurity } from "./components/admin/AdminSecurityGate";
 import Header from "./components/Header";
@@ -291,15 +293,21 @@ const AuthCallbackWithRedirect = () => {
 
 const queryClient = new QueryClient();
 
+import { PushNotificationManager } from "./components/PushNotificationManager";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+
 const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <AuthProvider>
+          <PushNotificationManager />
+        <PWAInstallPrompt />
         <CartProvider>
-          <TooltipProvider>
-            <BrowserRouter>
-            <div className="flex flex-col min-h-screen">
-              <Header />
+          <BrowserRouter>
+            <TooltipProvider>
+              <div className="flex flex-col min-h-screen">
+                <Header />
               <div className="flex-grow">
                 <Suspense
                   fallback={
@@ -469,6 +477,10 @@ const App = () => (
                       path="/admin/subscriptions"
                       element={<AdminRoute minRole="admin" requiredPermissions={["can_manage_subscriptions"]}><AdminDashboard /></AdminRoute>}
                     />
+                    <Route
+                      path="/admin/wallets"
+                      element={<AdminRoute minRole="admin" requiredPermissions={["can_manage_users"]}><AdminWallets /></AdminRoute>}
+                    />
 
                     {/* Admin Aliases */}
                     <Route path="/administration" element={<Navigate to="/admin" replace />} />
@@ -481,12 +493,13 @@ const App = () => (
               </div>
               <Footer />
             </div>
+            </TooltipProvider>
           </BrowserRouter>
           <Toaster />
           <Sonner />
-        </TooltipProvider>
-      </CartProvider>
+        </CartProvider>
     </AuthProvider>
+      </ThemeProvider>
   </QueryClientProvider>
 </HelmetProvider>
 );

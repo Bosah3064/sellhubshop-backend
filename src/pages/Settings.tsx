@@ -528,6 +528,7 @@ export default function Settings() {
         updateData.email = user.email;
       }
 
+      console.log("Saving profile data:", updateData); 
       const { error } = await supabase.from("profiles").upsert(updateData);
 
       if (error) throw error;

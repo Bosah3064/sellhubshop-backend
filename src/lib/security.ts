@@ -313,6 +313,241 @@ export class SecurityManager {
     return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
 
+  // TOTP (Time-based One-Time Password) functions for 2FA
+  /**
+   * Generate a TOTP code from a secret
+   * @param secret Base32 encoded secret
+   * @returns 6-digit TOTP code
+   */
+  generateTOTP(secret: string): string {
+    try {
+      // Get current time step (30 second intervals)
+      const timeStep = Math.floor(Date.now() / 1000 / 30);
+      
+      // Convert secret from base32 to bytes
+      const secretBytes = this.base32ToBytes(secret);
+      
+      // Create HMAC-SHA1 hash
+      const hmac = this.hmacSHA1(secretBytes, this.intToBytes(timeStep));
+      
+      // Dynamic truncation
+      const offset = hmac[hmac.length - 1] & 0x0f;
+      const code = (
+        ((hmac[offset] & 0x7f) << 24) |
+        ((hmac[offset + 1] & 0xff) << 16) |
+        ((hmac[offset + 2] & 0xff) << 8) |
+        (hmac[offset + 3] & 0xff)
+      ) % 1000000;
+      
+      return code.toString().padStart(6, '0');
+    } catch (error) {
+      console.error('Error generating TOTP:', error);
+      return '000000';
+    }
+  }
+
+  /**
+   * Verify a TOTP code against a secret
+   * @param secret Base32 encoded secret
+   * @param code 6-digit code to verify
+   * @param window Time window to check (default: 1 = ±30 seconds)
+   * @returns true if code is valid
+   */
+  async verifyTOTP(secret: string, code: string): Promise<boolean> {
+    try {
+      if (!secret || !code || code.length !== 6) {
+        return false;
+      }
+
+      // Check current time step and ±1 step (90 second window total)
+      const timeStep = Math.floor(Date.now() / 1000 / 30);
+      
+      for (let i = -1; i <= 1; i++) {
+        const testTimeStep = timeStep + i;
+        const secretBytes = this.base32ToBytes(secret);
+        const hmac = this.hmacSHA1(secretBytes, this.intToBytes(testTimeStep));
+        
+        const offset = hmac[hmac.length - 1] & 0x0f;
+        const testCode = (
+          ((hmac[offset] & 0x7f) << 24) |
+          ((hmac[offset + 1] & 0xff) << 16) |
+          ((hmac[offset + 2] & 0xff) << 8) |
+          (hmac[offset + 3] & 0xff)
+        ) % 1000000;
+        
+        if (testCode.toString().padStart(6, '0') === code) {
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error verifying TOTP:', error);
+      return false;
+    }
+  }
+
+  // Helper: Convert base32 string to bytes
+  private base32ToBytes(base32: string): Uint8Array {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const cleanedBase32 = base32.toUpperCase().replace(/=+$/, '');
+    const bits: number[] = [];
+    
+    for (let i = 0; i < cleanedBase32.length; i++) {
+      const val = alphabet.indexOf(cleanedBase32[i]);
+      if (val === -1) throw new Error('Invalid base32 character');
+      bits.push(...val.toString(2).padStart(5, '0').split('').map(Number));
+    }
+    
+    const bytes: number[] = [];
+    for (let i = 0; i + 8 <= bits.length; i += 8) {
+      bytes.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    }
+    
+    return new Uint8Array(bytes);
+  }
+
+  // Helper: Convert integer to 8-byte array
+  private intToBytes(num: number): Uint8Array {
+    const bytes = new Uint8Array(8);
+    for (let i = 7; i >= 0; i--) {
+      bytes[i] = num & 0xff;
+      num = num >> 8;
+    }
+    return bytes;
+  }
+
+  // Helper: HMAC-SHA1 implementation
+  private hmacSHA1(key: Uint8Array, message: Uint8Array): Uint8Array {
+    const blockSize = 64;
+    
+    // Adjust key length
+    let adjustedKey = key;
+    if (key.length > blockSize) {
+      adjustedKey = this.sha1(key);
+    } else if (key.length < blockSize) {
+      const temp = new Uint8Array(blockSize);
+      temp.set(key);
+      adjustedKey = temp;
+    }
+    
+    // Create inner and outer padded keys
+    const innerPad = new Uint8Array(blockSize);
+    const outerPad = new Uint8Array(blockSize);
+    
+    for (let i = 0; i < blockSize; i++) {
+      innerPad[i] = adjustedKey[i] ^ 0x36;
+      outerPad[i] = adjustedKey[i] ^ 0x5c;
+    }
+    
+    // HMAC = SHA1(outerPad || SHA1(innerPad || message))
+    const innerHash = this.sha1(this.concatArrays(innerPad, message));
+    return this.sha1(this.concatArrays(outerPad, innerHash));
+  }
+
+  // Helper: Simple SHA-1 implementation (for TOTP only, not for security-critical hashing)
+  private sha1(data: Uint8Array): Uint8Array {
+    // This is a simplified implementation. In production, use Web Crypto API
+    // For now, we'll use a basic implementation that works for TOTP
+    const hash = new Uint8Array(20);
+    
+    // Initialize hash values
+    let h0 = 0x67452301;
+    let h1 = 0xEFCDAB89;
+    let h2 = 0x98BADCFE;
+    let h3 = 0x10325476;
+    let h4 = 0xC3D2E1F0;
+    
+    // Pre-processing
+    const ml = data.length * 8;
+    const paddedLength = Math.ceil((data.length + 9) / 64) * 64;
+    const padded = new Uint8Array(paddedLength);
+    padded.set(data);
+    padded[data.length] = 0x80;
+    
+    // Append length as 64-bit big-endian
+    for (let i = 0; i < 8; i++) {
+      padded[paddedLength - 1 - i] = (ml >> (i * 8)) & 0xff;
+    }
+    
+    // Process 512-bit chunks
+    for (let chunk = 0; chunk < paddedLength; chunk += 64) {
+      const w = new Array(80);
+      
+      // Break chunk into sixteen 32-bit big-endian words
+      for (let i = 0; i < 16; i++) {
+        w[i] = (padded[chunk + i * 4] << 24) |
+               (padded[chunk + i * 4 + 1] << 16) |
+               (padded[chunk + i * 4 + 2] << 8) |
+               padded[chunk + i * 4 + 3];
+      }
+      
+      // Extend the sixteen 32-bit words into eighty 32-bit words
+      for (let i = 16; i < 80; i++) {
+        w[i] = this.rotateLeft(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+      }
+      
+      // Initialize working variables
+      let a = h0, b = h1, c = h2, d = h3, e = h4;
+      
+      // Main loop
+      for (let i = 0; i < 80; i++) {
+        let f, k;
+        if (i < 20) {
+          f = (b & c) | ((~b) & d);
+          k = 0x5A827999;
+        } else if (i < 40) {
+          f = b ^ c ^ d;
+          k = 0x6ED9EBA1;
+        } else if (i < 60) {
+          f = (b & c) | (b & d) | (c & d);
+          k = 0x8F1BBCDC;
+        } else {
+          f = b ^ c ^ d;
+          k = 0xCA62C1D6;
+        }
+        
+        const temp = (this.rotateLeft(a, 5) + f + e + k + w[i]) & 0xFFFFFFFF;
+        e = d;
+        d = c;
+        c = this.rotateLeft(b, 30);
+        b = a;
+        a = temp;
+      }
+      
+      // Add this chunk's hash to result
+      h0 = (h0 + a) & 0xFFFFFFFF;
+      h1 = (h1 + b) & 0xFFFFFFFF;
+      h2 = (h2 + c) & 0xFFFFFFFF;
+      h3 = (h3 + d) & 0xFFFFFFFF;
+      h4 = (h4 + e) & 0xFFFFFFFF;
+    }
+    
+    // Produce the final hash value
+    for (let i = 0; i < 4; i++) {
+      hash[i] = (h0 >> (24 - i * 8)) & 0xff;
+      hash[i + 4] = (h1 >> (24 - i * 8)) & 0xff;
+      hash[i + 8] = (h2 >> (24 - i * 8)) & 0xff;
+      hash[i + 12] = (h3 >> (24 - i * 8)) & 0xff;
+      hash[i + 16] = (h4 >> (24 - i * 8)) & 0xff;
+    }
+    
+    return hash;
+  }
+
+  // Helper: Rotate left
+  private rotateLeft(n: number, bits: number): number {
+    return ((n << bits) | (n >>> (32 - bits))) & 0xFFFFFFFF;
+  }
+
+  // Helper: Concatenate two Uint8Arrays
+  private concatArrays(a: Uint8Array, b: Uint8Array): Uint8Array {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
   // Security audit functions using unified admin_actions table
   async performSecurityAudit(): Promise<SecurityAudit> {
     try {
@@ -1015,83 +1250,5 @@ ${findings.login_activity?.failed_attempts > 10 ? '• Review failed login patte
       console.error("Error getting security metrics:", error);
       throw error;
     }
-  }
-
-  // Real TOTP Verification using Web Crypto API
-  async verifyTOTP(secret: string, code: string): Promise<boolean> {
-    try {
-      if (!secret || !code) return false;
-
-      const epoch = Math.floor(Date.now() / 1000);
-      const counter = Math.floor(epoch / 30);
-
-      // Check window of 3 intervals (90 total seconds) for clock drift
-      for (let i = -1; i <= 1; i++) {
-        const generatedCode = await this.generateOTP(secret, counter + i); // Changed to generateOTP and passed secret
-        if (generatedCode === code) return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("TOTP verification error:", error);
-      return false;
-    }
-  }
-
-  private base32Decode(base32: string): Uint8Array {
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-    const cleaned = base32.toUpperCase().replace(/=+$/, "");
-    const length = cleaned.length;
-    const bytes = new Uint8Array(Math.floor((length * 5) / 8));
-    let view = 0;
-    let bits = 0;
-    let index = 0;
-
-    for (let i = 0; i < length; i++) {
-      const value = alphabet.indexOf(cleaned[i]);
-      if (value === -1) continue; // Skip invalid characters
-      view = (view << 5) | value;
-      bits += 5;
-      if (bits >= 8) {
-        bytes[index++] = (view >> (bits - 8)) & 0xff;
-        bits -= 8;
-      }
-    }
-    return bytes;
-  }
-
-  private async generateOTP(secret: string, counter: number): Promise<string> {
-    const keyBytes = this.base32Decode(secret);
-    const counterBytes = new Uint8Array(8);
-    let tempCounter = BigInt(counter);
-    for (let i = 7; i >= 0; i--) {
-      counterBytes[i] = Number(tempCounter & BigInt(0xff));
-      tempCounter = tempCounter >> BigInt(8);
-    }
-
-    const cryptoKey = await window.crypto.subtle.importKey(
-      "raw",
-      keyBytes.buffer as ArrayBuffer,
-      { name: "HMAC", hash: "SHA-1" },
-      false,
-      ["sign"]
-    );
-
-    // HMAC-SHA1
-    const signature = await window.crypto.subtle.sign(
-      "HMAC",
-      cryptoKey,
-      counterBytes.buffer as ArrayBuffer
-    );
-
-    const signatureArray = new Uint8Array(signature);
-    const offset = signatureArray[signatureArray.length - 1] & 0x0f;
-    const otp = (
-      ((signatureArray[offset] & 0x7f) << 24) |
-      ((signatureArray[offset + 1] & 0xff) << 16) |
-      ((signatureArray[offset + 2] & 0xff) << 8) |
-      (signatureArray[offset + 3] & 0xff)
-    ) % 1000000;
-
-    return otp.toString().padStart(6, "0");
   }
 }

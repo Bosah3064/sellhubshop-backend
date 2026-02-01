@@ -1,27 +1,45 @@
 {
   "short_name": "SellHubShop",
-  "name": "SellHubShop - Ecommerce PWA",
-  "description": "Your trusted platform for buying and selling products online",
+  "name": "SellHubShop - Your Marketplace",
+  "description": "Buy and sell products online with SellHubShop - Kenya's premier marketplace platform",
   "icons": [
     {
       "src": "logo.png",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/png"
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "pwa-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "theme_color": "#16a34a",
   "background_color": "#ffffff",
-  "orientation": "portrait-primary"
+  "orientation": "portrait-primary",
+  "categories": ["shopping", "business"],
+  "scope": "/",
+  "lang": "en"
 }
