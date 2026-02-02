@@ -2295,43 +2295,42 @@ export default function Marketplace() {
           onOpenChange={handleCloseProductModal}
         >
           <DialogContent 
-            className="max-w-[95vw] sm:max-w-4xl md:max-w-5xl lg:max-w-6xl p-0 border-none bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl h-[90vh] overflow-hidden"
+            className="max-w-[95vw] sm:max-w-4xl md:max-w-5xl lg:max-w-6xl p-0 border-none bg-white dark:bg-gray-900 rounded-3xl shadow-2xl h-[90vh] overflow-y-auto"
             ref={modalContentRef}
           >
             {selectedProduct && (
-              <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-500">
+              <div className="animate-in fade-in zoom-in-95 duration-500">
                 {/* Header Section - Modern Hierarchy */}
-                <div className="relative px-6 py-8 sm:px-12 sm:pt-12 sm:pb-8 border-b border-gray-100/50">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase py-1 px-3 rounded-full">
+                <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 px-6 py-6 sm:px-8 sm:py-8 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-primary/10 text-primary border-none text-[10px] font-bold tracking-wider uppercase py-1.5 px-3 rounded-full">
                         {selectedProduct.category}
                       </Badge>
                       {selectedProduct.profiles?.verified && (
-                        <Badge className="bg-emerald-500 text-white border-none text-[10px] font-black tracking-widest uppercase py-1 px-3 rounded-full shadow-lg shadow-emerald-500/20">
+                        <Badge className="bg-emerald-500 text-white border-none text-[10px] font-bold tracking-wider uppercase py-1.5 px-3 rounded-full shadow-lg shadow-emerald-500/20">
                           <ShieldCheck className="h-3 w-3 mr-1" />
-                          Verified Listing
+                          Verified
                         </Badge>
                       )}
                     </div>
-                    <h2 className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight leading-none truncate max-w-4xl">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                       {selectedProduct.name}
                     </h2>
-                    <div className="flex items-center gap-4 mt-4 text-gray-500">
-                       <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                    <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                       <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full">
                           <MapPin className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-xs font-bold">{selectedProduct.location || "Nairobi"}</span>
+                          <span className="text-xs font-medium">{selectedProduct.location || "Nairobi"}</span>
                        </div>
-                       <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                       <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full">
                           <Clock className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-xs font-bold">{formatDate(selectedProduct.created_at)}</span>
+                          <span className="text-xs font-medium">{formatDate(selectedProduct.created_at)}</span>
                        </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
                     
                     {/* Media Column (LHS) */}
                     <div className="lg:col-span-7 bg-gray-50/50 p-6 sm:p-12">
