@@ -2517,7 +2517,6 @@ export default function Marketplace() {
                       )}
                     </div>
                   </div>
-                  </div>
                 </div>
                 
                 {/* Secondary Actions - Floating Bottom on Mobile (optional) */}
