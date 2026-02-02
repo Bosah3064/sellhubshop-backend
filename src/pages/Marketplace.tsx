@@ -2037,7 +2037,7 @@ export default function Marketplace() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
                   {products.map((product) => {
                     const sellerRating = getSellerRating(product.profiles);
                     const isFavorite = favorites.has(product.id);
@@ -2295,7 +2295,7 @@ export default function Marketplace() {
           onOpenChange={handleCloseProductModal}
         >
           <DialogContent 
-            className="max-w-[95vw] sm:max-w-4xl md:max-w-5xl lg:max-w-6xl p-0 overflow-hidden border-none bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl h-[90vh] sm:h-auto sm:max-h-[80vh]"
+            className="max-w-[95vw] sm:max-w-4xl md:max-w-5xl lg:max-w-6xl p-0 border-none bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl h-[90vh] overflow-hidden"
             ref={modalContentRef}
           >
             {selectedProduct && (
