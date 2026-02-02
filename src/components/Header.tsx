@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, memo } from "react";
+import { useEffect, useState, useRef, useCallback, memo, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,7 @@ import {
   Award,
   Clock,
   CreditCard,
+  Loader2,
 } from "lucide-react";
 const BannerCarousel = lazy(() => 
   import("@/pages/BannerCarousel").then(module => ({ default: module.BannerCarousel }))
