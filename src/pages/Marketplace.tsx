@@ -2127,7 +2127,7 @@ export default function Marketplace() {
                             )}
                           </div>
 
-                          <div className="flex items-center justify-between mt-auto">
+                          <div className="flex flex-col gap-4 mt-auto">
                             <div className="flex flex-col">
                                 <div className="flex items-center gap-2 mb-0.5">
                                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</span>
@@ -2142,8 +2142,9 @@ export default function Marketplace() {
                                     className="text-2xl font-black text-gray-900"
                                 />
                             </div>
-                            <div className="flex flex-col items-end">
-                                <div className="flex items-center gap-2 mb-1">
+                            
+                            <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                                <div className="flex items-center gap-2">
                                   {product.profiles?.avatar_url ? (
                                     <div className="relative">
                                       <Avatar className="h-6 w-6 border border-gray-100">
@@ -2160,8 +2161,8 @@ export default function Marketplace() {
                                        <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${isUserOnline(product.profiles?.updated_at) ? "bg-green-500" : "bg-gray-300"}`}></span>
                                     </div>
                                   )}
-                                  <div className="flex flex-col items-end">
-                                    <span className="text-[10px] font-medium text-gray-700 max-w-[80px] truncate">
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] font-medium text-gray-700 max-w-[100px] truncate">
                                       {product.profiles?.full_name || "Seller"}
                                     </span>
                                     <span className="text-[8px] text-gray-400">
@@ -2169,7 +2170,7 @@ export default function Marketplace() {
                                     </span>
                                   </div>
                                 </div>
-                                <div className="flex items-center text-gray-500 text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg mt-1">
+                                <div className="flex items-center text-gray-500 text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg">
                                     <MapPin className="h-3 w-3 mr-1 text-secondary" />
                                     {product.location?.split(',')[0]}
                                 </div>
