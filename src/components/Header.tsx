@@ -62,7 +62,9 @@ import {
   Clock,
   CreditCard,
 } from "lucide-react";
-import { BannerCarousel } from "@/pages/BannerCarousel";
+const BannerCarousel = lazy(() => 
+  import("@/pages/BannerCarousel").then(module => ({ default: module.BannerCarousel }))
+);
 import { useCart } from "@/hooks/useCart";
 import { Wallet } from "lucide-react";
 import { DarkModeToggle } from "./ui/dark-mode-toggle";
@@ -226,7 +228,9 @@ const ScrollableBanner = () => {
       className={`transition-all duration-300 ease-in-out ${isVisible ? "max-h-24 opacity-100" : "max-h-0 opacity-0 overflow-hidden"
         }`}
     >
-      <BannerCarousel />
+      <Suspense fallback={<div className="h-24 bg-gray-900 flex items-center justify-center"><Loader2 className="h-6 w-6 text-white animate-spin" /></div>}>
+        <BannerCarousel />
+      </Suspense>
     </div>
   );
 };
