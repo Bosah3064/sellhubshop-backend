@@ -77,6 +77,7 @@ import {
   SignalLow,
   SignalMedium,
   SignalHigh,
+  Users,
   Smartphone,
   ShoppingCart,
   Trash2,

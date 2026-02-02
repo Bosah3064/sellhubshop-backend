@@ -146,7 +146,7 @@ export function FilterSidebar({
                         className="w-full pl-3 pr-10 py-2 text-sm border border-gray-200 rounded-md appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white disabled:bg-gray-50 disabled:text-gray-400"
                     >
                         <option value="">{selectedCounty ? "All Areas" : "Select County first"}</option>
-                        {locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                        {locations.map((l, index) => <option key={`${l.id}-${index}`} value={l.name}>{l.name}</option>)}
                     </select>
                     <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
