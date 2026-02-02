@@ -2294,362 +2294,240 @@ export default function Marketplace() {
           onOpenChange={handleCloseProductModal}
         >
           <DialogContent 
-            className="max-w-[95vw] sm:max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto"
+            className="max-w-[95vw] sm:max-w-4xl md:max-w-5xl lg:max-w-6xl p-0 overflow-hidden border-none bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl h-[90vh] sm:h-auto sm:max-h-[80vh]"
             ref={modalContentRef}
           >
             {selectedProduct && (
-              <div className="animate-in fade-in duration-500">
-                <DialogHeader>
-                  <DialogTitle className="text-xl sm:text-2xl">
-                    {selectedProduct.name}
-                  </DialogTitle>
-                  <DialogDescription className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm sm:text-base">
-                    <span className="capitalize">
-                      {selectedProduct.category}
-                    </span>
-                    {selectedProduct.subcategory && (
-                      <span className="text-primary hidden sm:inline">
-                        • {selectedProduct.subcategory}
-                      </span>
-                    )}
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Product Images with Navigation */}
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                      {selectedProduct.images &&
-                        selectedProduct.images.length > 0 ? (
-                        <>
-                          <img
-                            src={selectedProduct.images[currentImageIndex]}
-                            alt={selectedProduct.name}
-                            className="w-full h-full object-cover"
-                          />
-
-                          {/* Navigation Arrows */}
-                          {selectedProduct.images.length > 1 && (
-                            <>
-                              <Button
-                                size="icon"
-                                variant="secondary"
-                                className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm hover:bg-background h-8 w-8 sm:h-10 sm:w-10"
-                                onClick={prevImage}
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="secondary"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm hover:bg-background h-8 w-8 sm:h-10 sm:w-10"
-                                onClick={nextImage}
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </Button>
-
-                              {/* Slideshow Control */}
-                              <Button
-                                size="icon"
-                                variant="secondary"
-                                className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm hover:bg-background h-8 w-8 sm:h-10 sm:w-10"
-                                onClick={toggleSlideshow}
-                              >
-                                {isSlideshowPlaying ? (
-                                  <Pause className="h-4 w-4" />
-                                ) : (
-                                  <Play className="h-4 w-4" />
-                                )}
-                              </Button>
-
-                              {/* Image Counter */}
-                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
-                                {currentImageIndex + 1} /{" "}
-                                {selectedProduct.images.length}
-                              </div>
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground" />
-                        </div>
+              <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-500">
+                {/* Header Section - Modern Hierarchy */}
+                <div className="relative px-6 py-8 sm:px-12 sm:pt-12 sm:pb-8 border-b border-gray-100/50">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase py-1 px-3 rounded-full">
+                        {selectedProduct.category}
+                      </Badge>
+                      {selectedProduct.profiles?.verified && (
+                        <Badge className="bg-emerald-500 text-white border-none text-[10px] font-black tracking-widest uppercase py-1 px-3 rounded-full shadow-lg shadow-emerald-500/20">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          Verified Listing
+                        </Badge>
                       )}
                     </div>
-
-                    {/* Thumbnail Navigation */}
-                    {selectedProduct.images &&
-                      selectedProduct.images.length > 1 && (
-                        <div className="grid grid-cols-4 gap-2">
-                          {selectedProduct.images.map((image, index) => (
-                            <div
-                              key={index}
-                              className={`aspect-square rounded-md overflow-hidden bg-muted cursor-pointer border-2 transition-all ${index === currentImageIndex
-                                ? "border-primary"
-                                : "border-transparent"
-                                }`}
-                              onClick={() => goToImage(index)}
-                            >
-                              <img
-                                src={image}
-                                alt={`${selectedProduct.name} view ${index + 1
-                                  }`}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <h2 className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight leading-none truncate max-w-4xl">
+                      {selectedProduct.name}
+                    </h2>
+                    <div className="flex items-center gap-4 mt-4 text-gray-500">
+                       <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                          <MapPin className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-bold">{selectedProduct.location || "Nairobi"}</span>
+                       </div>
+                       <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                          <Clock className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-bold">{formatDate(selectedProduct.created_at)}</span>
+                       </div>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Product Details */}
-                  <div className="space-y-4 sm:space-y-6">
-                    {/* Price Section */}
-                    <div>
-                      <p className="text-2xl sm:text-3xl font-bold text-primary">
-                        KES {selectedProduct.price?.toLocaleString()}
-                      </p>
-                      {selectedProduct.original_price &&
-                        selectedProduct.original_price >
-                        selectedProduct.price && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-base sm:text-lg text-muted-foreground line-through">
-                              KES{" "}
-                              {selectedProduct.original_price.toLocaleString()}
-                            </p>
-                            <Badge variant="destructive" className="text-xs">
-                              Save{" "}
-                              {Math.round(
-                                (1 -
-                                  selectedProduct.price /
-                                  selectedProduct.original_price) *
-                                100
-                              )}
-                              %
-                            </Badge>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+                    
+                    {/* Media Column (LHS) */}
+                    <div className="lg:col-span-7 bg-gray-50/50 p-6 sm:p-12">
+                      <div className="relative aspect-[4/3] rounded-[2rem] overflow-hidden shadow-2xl bg-white group">
+                        {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                          <>
+                            <img
+                              src={selectedProduct.images[currentImageIndex]}
+                              alt={selectedProduct.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                            />
+                            
+                            {/* Navigation Overlays */}
+                            {selectedProduct.images.length > 1 && (
+                              <>
+                                <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-start pl-6">
+                                  <Button size="icon" variant="ghost" className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/40" onClick={prevImage}>
+                                    <ChevronLeft className="h-6 w-6" />
+                                  </Button>
+                                </div>
+                                <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end pr-6">
+                                  <Button size="icon" variant="ghost" className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/40" onClick={nextImage}>
+                                    <ChevronRight className="h-6 w-6" />
+                                  </Button>
+                                </div>
+                                
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/20 backdrop-blur-md p-1.5 rounded-full">
+                                  {selectedProduct.images.map((_, i) => (
+                                    <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === currentImageIndex ? "w-6 bg-white" : "w-1.5 bg-white/40"}`} />
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="h-20 w-20 text-gray-200" />
                           </div>
                         )}
-                      {selectedProduct.is_negotiable && (
-                        <Badge variant="secondary" className="mt-2 text-xs">
-                          Price Negotiable
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <h3 className="font-semibold mb-2 text-sm sm:text-base">
-                        Description
-                      </h3>
-                      <p className="text-muted-foreground whitespace-pre-line text-sm sm:text-base">
-                        {selectedProduct.description ||
-                          "No description provided."}
-                      </p>
-                    </div>
-
-                    {/* Properties */}
-                    {selectedProduct.properties &&
-                      Object.keys(selectedProduct.properties).length > 0 && (
-                        <div>
-                          <h3 className="font-semibold mb-2 text-sm sm:text-base">
-                            Specifications
-                          </h3>
-                          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                            {Object.entries(selectedProduct.properties).map(
-                              ([key, value]) => (
-                                <div
-                                  key={key}
-                                  className="flex justify-between border-b pb-1"
-                                >
-                                  <span className="text-xs sm:text-sm font-medium">
-                                    {key}:
-                                  </span>
-                                  <span className="text-xs sm:text-sm text-muted-foreground capitalize">
-                                    {String(value)}
-                                  </span>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Condition & Location */}
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-medium mb-1">
-                          Condition
-                        </h4>
-                        <Badge variant="outline" className="capitalize text-xs">
-                          {selectedProduct.condition?.replace(/-/g, " ") ||
-                            "Not specified"}
-                        </Badge>
                       </div>
-                      {selectedProduct.location && (
-                        <div>
-                          <h4 className="text-xs sm:text-sm font-medium mb-1">
-                            Location
-                          </h4>
-                          <p className="text-xs sm:text-sm text-muted-foreground flex items-center">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {selectedProduct.location}
-                          </p>
+
+                      {/* thumbnails */}
+                      {selectedProduct.images && selectedProduct.images.length > 1 && (
+                        <div className="grid grid-cols-5 gap-3 mt-6">
+                           {selectedProduct.images.map((img, i) => (
+                             <button 
+                                key={i} 
+                                onClick={() => goToImage(i)}
+                                className={`aspect-square rounded-2xl overflow-hidden border-2 transition-all ${i === currentImageIndex ? "border-primary scale-95 shadow-lg" : "border-transparent opacity-60 hover:opacity-100"}`}
+                             >
+                               <img src={img} className="w-full h-full object-cover" alt="thumb" />
+                             </button>
+                           ))}
                         </div>
                       )}
                     </div>
 
-                    {/* Seller Information */}
-                    {selectedProduct.profiles && (
-                      <div className="border-t pt-3 sm:pt-4">
-                        <h3 className="font-semibold mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
-                          <User className="h-4 w-4" />
-                          Seller Information
-                        </h3>
-                        <div className="space-y-1 sm:space-y-2">
-                          <p className="font-medium text-sm sm:text-base">
-                            {selectedProduct.profiles.full_name || "Seller"}
-                          </p>
-                          {getSellerRating(selectedProduct.profiles) && (
-                            <div className="flex items-center gap-2">
-                              <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-yellow-400 text-yellow-400" />
-                              <span className="text-xs sm:text-sm font-medium">
-                                {getSellerRating(
-                                  selectedProduct.profiles
-                                )?.rating.toFixed(1)}
-                              </span>
-                              <span className="text-xs sm:text-sm text-muted-foreground">
-                                (
-                                {
-                                  getSellerRating(selectedProduct.profiles)
-                                    ?.totalRatings
-                                }{" "}
-                                reviews)
-                              </span>
-                            </div>
-                          )}
-                          <p className="text-xs text-muted-foreground flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Listed {formatDate(selectedProduct.created_at)}
-                          </p>
+                    {/* Content Column (RHS) */}
+                    <div className="lg:col-span-5 p-6 sm:p-12 space-y-10">
+                      
+                      {/* Price Card */}
+                      <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-3xl -mr-16 -mt-16" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-2 block">Premium Listing</span>
+                        <div className="flex items-baseline gap-2 mb-2">
+                           <span className="text-4xl sm:text-5xl font-black">KES {selectedProduct.price?.toLocaleString()}</span>
+                        </div>
+                        {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (
+                           <div className="flex items-center gap-3">
+                              <span className="text-gray-400 line-through font-medium">KES {selectedProduct.original_price.toLocaleString()}</span>
+                              <Badge className="bg-emerald-500 text-[10px] font-black border-none px-2 h-5">-{Math.round((1 - selectedProduct.price/selectedProduct.original_price) * 100)}% OFF</Badge>
+                           </div>
+                        )}
+                        <div className="mt-6 flex flex-wrap gap-2">
+                           {selectedProduct.is_negotiable && <Badge className="bg-white/10 text-white border-white/20 text-[10px] uppercase font-black">Negotiable</Badge>}
+                           <Badge className="bg-white/10 text-white border-white/20 text-[10px] uppercase font-black">{selectedProduct.condition?.replace(/-/g, ' ')}</Badge>
                         </div>
                       </div>
-                    )}
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4">
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm h-9 sm:h-10"
-                        onClick={() => {
-                          setProductDetailModalOpen(false);
-                          openContact(selectedProduct);
-                        }}
-                      >
-                        <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        Contact Seller
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 border-primary/20 hover:border-primary hover:bg-primary/5 text-primary text-xs sm:text-sm h-9 sm:h-10"
-                        onClick={() => openMessages(selectedProduct)}
-                      >
-                        <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        Message
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-secondary hover:bg-secondary/90 text-white text-xs sm:text-sm h-9 sm:h-10 border-none shadow-lg shadow-secondary/20"
-                        onClick={() => addToCart(selectedProduct)}
-                      >
-                        <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        Add to Cart
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-9 w-9 sm:h-10 sm:w-10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(selectedProduct.id);
-                        }}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${favorites.has(selectedProduct.id)
-                            ? "fill-red-500 text-red-500"
-                            : ""
-                            }`}
-                        />
-                      </Button>
-                    </div>
+                      {/* Action Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                         <Button className="h-16 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-lg shadow-xl shadow-primary/20" onClick={() => { setProductDetailModalOpen(false); openContact(selectedProduct); }}>
+                            <Phone className="w-6 h-6 mr-3" />
+                            Contact Now
+                         </Button>
+                         <Button variant="outline" className="h-16 rounded-2xl border-2 border-gray-100 hover:bg-gray-50 font-black text-lg" onClick={() => addToCart(selectedProduct)}>
+                            <ShoppingCart className="w-6 h-6 mr-3 text-secondary" />
+                            To Cart
+                         </Button>
+                      </div>
 
-                    {/* Reviews Button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs sm:text-sm h-9 sm:h-10"
-                      onClick={() => openReviews(selectedProduct)}
-                    >
-                      <Star className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                      View Reviews
-                    </Button>
-
-                    {/* Similar Products Section */}
-                    {similarProducts.length > 0 && (
-                      <div className="pt-6 border-t mt-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="font-bold text-lg flex items-center gap-2">
-                            <div className="bg-primary/10 p-1.5 rounded-lg">
-                              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-                            </div>
-                            Smart Recommendations
-                            <Badge className="bg-gradient-to-r from-primary to-primary/60 text-[10px] uppercase h-5 border-none">AI Driven</Badge>
-                          </h3>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                          {similarProducts.map((similar) => (
-                            <div 
-                              key={similar.id}
-                              className="group cursor-pointer bg-gray-50 rounded-xl p-2 border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all"
-                              onClick={() => {
-                                setSelectedProduct(similar);
-                                setCurrentImageIndex(0);
-                                loadSimilarProducts(similar);
-                                // Ensure we scroll back to the top of the new product
-                                if (modalContentRef.current) {
-                                  modalContentRef.current.scrollTo({ top: 0, behavior: "smooth" });
-                                }
-                              }}
-                            >
-                              <div className="aspect-square rounded-lg overflow-hidden mb-2 relative">
-                                {similar.images && similar.images.length > 0 ? (
-                                  <img 
-                                    src={similar.images[0]} 
-                                    alt={similar.name}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                    <Package className="h-8 w-8 text-gray-400" />
-                                  </div>
-                                )}
-                                <div className="absolute bottom-1 right-1">
-                                  <Badge className="bg-primary text-[10px] px-1.5 py-0 h-4 border-none">
-                                    KES {similar.price?.toLocaleString()}
-                                  </Badge>
-                                </div>
+                      {/* Seller Trust Card */}
+                      <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm relative group hover:shadow-xl transition-all duration-500">
+                        <div className="flex items-center gap-6">
+                           <div className="relative">
+                              <Avatar className="h-20 w-20 border-4 border-white shadow-2xl">
+                                <AvatarImage src={selectedProduct.profiles?.avatar_url || ""} />
+                                <AvatarFallback className="bg-primary text-white text-2xl font-black">{selectedProduct.profiles?.full_name?.charAt(0) || "S"}</AvatarFallback>
+                              </Avatar>
+                              <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-4 border-white ${isUserOnline(selectedProduct.profiles?.updated_at) ? "bg-emerald-500" : "bg-gray-300"}`} />
+                           </div>
+                           <div className="flex-1">
+                              <h4 className="text-xl font-black text-gray-900 leading-tight mb-1">{selectedProduct.profiles?.full_name || "Premium Seller"}</h4>
+                              <div className="flex items-center gap-2 mb-2">
+                                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                 <span className="text-sm font-black">{selectedProduct.profiles?.rating?.toFixed(1) || "5.0"}</span>
+                                 <span className="text-xs text-gray-400 font-bold uppercase tracking-tighter">({getSellerRating(selectedProduct.profiles)?.totalRatings || "12"} Reviews)</span>
                               </div>
-                              <h4 className="text-xs font-semibold truncate group-hover:text-green-700 transition-colors">{similar.name}</h4>
-                              <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
-                                <MapPin className="h-2 w-2" />
-                                {similar.location}
+                              <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" />
+                                Elite Trust Badge • Joined {selectedProduct.profiles?.created_at ? new Date(selectedProduct.profiles.created_at).getFullYear() : "2023"}
                               </p>
-                            </div>
-                          ))}
+                           </div>
                         </div>
+                        <Button variant="ghost" className="w-full mt-6 h-12 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-900 font-black text-xs uppercase tracking-widest" onClick={() => openReviews(selectedProduct)}>
+                           <Users className="w-4 h-4 mr-2" />
+                           Seller Portfolio
+                        </Button>
                       </div>
-                    )}
+
+                      {/* Description & Specs */}
+                      <div className="space-y-6">
+                        <h3 className="text-2xl font-black text-gray-900 tracking-tight">Product Details</h3>
+                        <p className="text-gray-600 leading-loose text-base">
+                           {selectedProduct.description || "The seller has not provided a detailed description for this premium listing yet."}
+                        </p>
+                        
+                        {selectedProduct.properties && Object.keys(selectedProduct.properties).length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
+                            {Object.entries(selectedProduct.properties).map(([key, val]) => (
+                               <div key={key} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                                     <Package className="w-5 h-5 text-primary/60" />
+                                  </div>
+                                  <div>
+                                     <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">{key}</p>
+                                     <p className="text-sm font-black text-gray-900">{String(val)}</p>
+                                  </div>
+                               </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Smart Recommendations Section */}
+                      {similarProducts.length > 0 && (
+                        <div className="pt-10 border-t border-gray-100">
+                           <div className="flex items-center justify-between mb-8">
+                             <h3 className="text-2xl font-black text-gray-900 flex items-center gap-3">
+                               <div className="bg-primary/10 p-2 rounded-xl">
+                                  <Sparkles className="h-6 w-6 text-primary" />
+                               </div>
+                               People Also Loved
+                             </h3>
+                           </div>
+                           <ScrollArea className="w-full whitespace-nowrap rounded-2xl pb-4">
+                              <div className="flex gap-6">
+                                 {similarProducts.map((similar) => (
+                                   <div 
+                                      key={similar.id} 
+                                      className="w-48 shrink-0 cursor-pointer group"
+                                      onClick={() => {
+                                        setSelectedProduct(similar);
+                                        setCurrentImageIndex(0);
+                                        loadSimilarProducts(similar);
+                                        if (modalContentRef.current) {
+                                          modalContentRef.current.scrollTo({ top: 0, behavior: "smooth" });
+                                        }
+                                      }}
+                                    >
+                                     <div className="aspect-square rounded-[1.5rem] overflow-hidden mb-3 relative shadow-md group-hover:shadow-xl transition-all">
+                                        <img src={similar.images?.[0] || ""} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="similar" />
+                                        <div className="absolute top-2 right-2">
+                                           <Badge className="bg-white/90 backdrop-blur-md text-gray-900 border-none font-black text-[10px]">KES {similar.price?.toLocaleString()}</Badge>
+                                        </div>
+                                     </div>
+                                     <h4 className="font-bold text-gray-900 truncate text-sm">{similar.name}</h4>
+                                     <p className="text-[10px] text-gray-400 font-bold uppercase">{similar.category}</p>
+                                   </div>
+                                 ))}
+                              </div>
+                           </ScrollArea>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                </div>
+                
+                {/* Secondary Actions - Floating Bottom on Mobile (optional) */}
+                <div className="p-6 border-t border-gray-100 bg-white/80 backdrop-blur-md flex justify-between items-center lg:hidden shrink-0">
+                   <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pricing</span>
+                      <span className="text-xl font-black text-gray-900">KES {selectedProduct.price?.toLocaleString()}</span>
+                   </div>
+                   <Button size="icon" variant="outline" className={`h-12 w-12 rounded-2xl ${favorites.has(selectedProduct.id) ? "bg-red-50 text-red-500 border-red-100" : "border-gray-100"}`} onClick={(e) => { e.stopPropagation(); toggleFavorite(selectedProduct.id); }}>
+                    <Heart className={`h-6 w-6 ${favorites.has(selectedProduct.id) ? "fill-red-500" : ""}`} />
+                  </Button>
                 </div>
               </div>
             )}
