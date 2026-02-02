@@ -142,8 +142,8 @@ router.post('/', async (req, res) => {
         });
 
         const url = MPESA_ENV === 'sandbox'
-            ? 'https://sandbox.safaricom.co.ke/mpesa/b2c/v3/paymentrequest'
-            : 'https://api.safaricom.co.ke/mpesa/b2c/v3/paymentrequest';
+            ? 'https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest'
+            : 'https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest';
 
         // 7. Send B2C request
         const response = await requestHelper.postRequest(url, b2cData, token);
