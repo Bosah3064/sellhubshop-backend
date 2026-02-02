@@ -146,11 +146,7 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black">
-            {step === 'input' && 'Withdraw Funds'}
-            {step === 'confirm' && 'Confirm Withdrawal'}
-            {step === 'processing' && 'Processing...'}
-          </DialogTitle>
+          <DialogTitle className="text-2xl font-black">Withdraw Funds</DialogTitle>
           <DialogDescription>
             {step === 'input' && 'Enter amount and M-Pesa number'}
             {step === 'confirm' && 'Please review your withdrawal details'}

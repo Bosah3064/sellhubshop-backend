@@ -348,7 +348,6 @@ const useDashboardData = () => {
   return {
     products,
     stats,
-    stats,
     performanceData, // Now returns real data state
     recentViewers, // Export new state
     plan,

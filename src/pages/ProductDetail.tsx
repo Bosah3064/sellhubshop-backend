@@ -33,6 +33,7 @@ import {
   Info,
   ShoppingCart,
   ShoppingBag,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -48,6 +49,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+import SEO from "@/components/SEO";
 import { ContactSellerDialog } from "@/components/dialogs/ContactSellerDialog";
 import { useCart } from "@/hooks/useCart";
 
@@ -1080,7 +1082,7 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
           {similarProducts.length > 0 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Similar Products</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
                 {similarProducts.map((p) => (
                   <Link key={p.id} to={`/product/${p.id}`} className="group">
                     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -1114,23 +1116,24 @@ ${product.description ? product.description.substring(0, 100) + "..." : ""}
       </Dialog>
       
       {/* Contact Seller Dialog */}
-      <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="text-center">Contact Seller</DialogTitle></DialogHeader>
-          <div className="flex flex-col items-center gap-6 py-4">
-            <Avatar className="w-20 h-20"><AvatarImage src={sellerProfile?.profile_image} /><AvatarFallback>{sellerProfile?.full_name?.charAt(0)}</AvatarFallback></Avatar>
-            <div className="text-center">
-              <h3 className="font-bold text-xl">{sellerProfile?.full_name || "Seller"}</h3>
-              <p className="text-sm text-muted-foreground">{sellerProfile?.location}</p>
-            </div>
-            <div className="w-full space-y-3">
-              <Button asChild className="w-full bg-[#25D366] hover:bg-[#128C7E]"><a href={`https://wa.me/${sellerProfile?.whatsapp || sellerProfile?.phone}`} target="_blank" rel="noreferrer"><MessageCircle className="mr-2" /> WhatsApp</a></Button>
-              <Button asChild className="w-full" variant="outline"><a href={`tel:${sellerProfile?.phone}`}><Phone className="mr-2" /> Call Now</a></Button>
-              <Button asChild className="w-full" variant="ghost"><a href={`sms:${sellerProfile?.phone}`}><MessageSquare className="mr-2" /> SMS</a></Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactSellerDialog
+        open={showContactDialog}
+        onOpenChange={setShowContactDialog}
+        sellerProfile={{
+          full_name: sellerProfile?.full_name,
+          username: sellerProfile?.username,
+          profile_image: sellerProfile?.avatar_url || sellerProfile?.profile_image,
+          rating: sellerProfile?.rating,
+          total_reviews: sellerProfile?.total_reviews,
+          phone: sellerProfile?.phone,
+          whatsapp: sellerProfile?.whatsapp,
+        }}
+        product={{
+          name: product?.name || "",
+          price: product?.price || 0,
+          currency: "KES"
+        }}
+      />
     </div>
   );
 }

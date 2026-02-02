@@ -258,6 +258,7 @@ export default function Marketplace() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const { addToCart } = useCart();
 
   // New Filter State
@@ -1986,7 +1987,7 @@ export default function Marketplace() {
             {/* Main Products Area */}
             <div className="lg:col-span-3">
               {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Card key={i} className="overflow-hidden border-0 shadow-lg rounded-2xl bg-white/50 backdrop-blur-sm animate-pulse">
                       <Skeleton className="h-64 w-full rounded-t-2xl" />
@@ -2035,7 +2036,7 @@ export default function Marketplace() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                   {products.map((product) => {
                     const sellerRating = getSellerRating(product.profiles);
                     const isFavorite = favorites.has(product.id);
@@ -2099,8 +2100,9 @@ export default function Marketplace() {
 
                           {/* Bottom Info Overlay */}
                           <div className="absolute bottom-6 left-6 right-6 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-500 h-12 flex gap-2">
-                             <Button className="flex-1 bg-white text-black hover:bg-gray-100 rounded-xl h-full font-bold shadow-xl shadow-black/20" onClick={(e) => openContact(product, e)}>
-                               Contact
+                             <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl h-full font-bold shadow-xl shadow-black/20" onClick={(e) => openContact(product, e)}>
+                               <Phone className="w-4 h-4 mr-2" />
+                               Contact Seller
                              </Button>
                              <Button size="icon" className="w-12 h-full bg-white/20 backdrop-blur-md rounded-xl text-white hover:bg-white/30" onClick={() => openProductDetails(product)}>
                                <Eye className="h-5 w-5" />
@@ -2603,7 +2605,7 @@ export default function Marketplace() {
                             <Badge className="bg-gradient-to-r from-primary to-primary/60 text-[10px] uppercase h-5 border-none">AI Driven</Badge>
                           </h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
                           {similarProducts.map((similar) => (
                             <div 
                               key={similar.id}
