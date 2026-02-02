@@ -65,6 +65,7 @@ import { ThemeProvider } from "next-themes";
 import { AdminSecurityGate as AdminSecurity } from "./components/admin/AdminSecurityGate";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import ScrollToTop from "./components/ScrollToTop";
 import { Shield, Loader2 } from "lucide-react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -305,6 +306,7 @@ const App = () => (
         <PWAInstallPrompt />
         <CartProvider>
           <BrowserRouter>
+            <ScrollToTop />
             <TooltipProvider>
               <div className="flex flex-col min-h-screen">
                 <Header />

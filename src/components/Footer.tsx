@@ -36,13 +36,6 @@ export default function Footer() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Auto-scroll to top when route changes
-  useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }, [location.pathname]);
 
   // Listen for the beforeinstallprompt event
   useEffect(() => {
