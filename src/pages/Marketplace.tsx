@@ -2518,17 +2518,6 @@ export default function Marketplace() {
                     </div>
                   </div>
                 </div>
-                
-                {/* Secondary Actions - Floating Bottom on Mobile (optional) */}
-                <div className="p-6 border-t border-gray-100 bg-white/80 backdrop-blur-md flex justify-between items-center lg:hidden shrink-0">
-                   <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pricing</span>
-                      <span className="text-xl font-black text-gray-900">KES {selectedProduct.price?.toLocaleString()}</span>
-                   </div>
-                   <Button size="icon" variant="outline" className={`h-12 w-12 rounded-2xl ${favorites.has(selectedProduct.id) ? "bg-red-50 text-red-500 border-red-100" : "border-gray-100"}`} onClick={(e) => { e.stopPropagation(); toggleFavorite(selectedProduct.id); }}>
-                    <Heart className={`h-6 w-6 ${favorites.has(selectedProduct.id) ? "fill-red-500" : ""}`} />
-                  </Button>
-                </div>
               </div>
             )}
           </DialogContent>
