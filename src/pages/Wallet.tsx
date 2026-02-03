@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { 
   Wallet as WalletIcon, 
   ArrowUpRight, 
@@ -120,27 +128,6 @@ const Wallet = () => {
   )).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   // Chart Data Generation
-  const getChartData = () => {
-    const last30Days = Array.from({ length: 15 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (14 - i));
-      return format(d, 'MMM dd');
-    });
-
-    return last30Days.map(date => {
-      const dayTxs = transactions.filter(tx => 
-        format(new Date(tx.created_at), 'MMM dd') === date && 
-        tx.status === 'completed'
-      );
-      
-      return {
-        date,
-        credits: dayTxs.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + tx.amount, 0),
-        debits: dayTxs.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + tx.amount, 0),
-      };
-    });
-  };
-
   const chartData = getChartData();
 
   const totalCredited = transactions
@@ -150,6 +137,26 @@ const Wallet = () => {
   const totalDebited = transactions
     .filter(tx => tx.type === 'debit' && tx.status === 'completed')
     .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+      case 'pending': return 'text-amber-600 bg-amber-50 border-amber-100';
+      case 'processing': return 'text-blue-600 bg-blue-50 border-blue-100';
+      case 'failed':
+      case 'cancelled': return 'text-rose-600 bg-rose-50 border-rose-100';
+      default: return 'text-gray-600 bg-gray-50 border-gray-100';
+    }
+  };
+
+  const getTransactionIcon = (type: string, refType: string) => {
+    if (type === 'credit') {
+        if (refType === 'order') return <div className="p-2 bg-emerald-100 rounded-xl text-emerald-600"><Zap className="w-4 h-4" /></div>;
+        return <div className="p-2 bg-emerald-100 rounded-xl text-emerald-600"><ArrowDownLeft className="w-4 h-4" /></div>;
+    }
+    if (refType === 'withdrawal') return <div className="p-2 bg-blue-100 rounded-xl text-blue-600"><ArrowUpRight className="w-4 h-4" /></div>;
+    return <div className="p-2 bg-gray-100 rounded-xl text-gray-600"><CreditCard className="w-4 h-4" /></div>;
+  };
 
   // ... existing helpers ...
 
@@ -843,70 +850,46 @@ const Wallet = () => {
                   )}
                 </div>
               ) : (
-                <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent pr-1">
-                  <div className="divide-y divide-gray-50 dark:divide-slate-800">
-                    {filteredTransactions.map((transaction) => (
-                      <div key={transaction.id} className="p-6 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-slate-800/20 transition-all group cursor-pointer relative overflow-hidden">
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-gray-200 dark:group-hover:bg-slate-700 transition-all" />
-                        
-                        <div className="flex items-center gap-4 flex-1">
-                          {/* Transaction Type Icon */}
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110 duration-300 ${
-                            transaction.type === 'credit' 
-                              ? 'bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-100 dark:border-emerald-500/20 shadow-sm shadow-emerald-100/50 dark:shadow-none' 
-                              : 'bg-blue-50 dark:bg-blue-500/10 border-2 border-blue-100 dark:border-blue-500/20 shadow-sm shadow-blue-100/50 dark:shadow-none'
-                          }`}>
-                            {transaction.type === 'credit' ? (
-                              <ArrowDownLeft className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <ArrowUpRight className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                            )}
-                          </div>
-                          
-                          {/* Transaction Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-black text-gray-900 dark:text-gray-100 truncate group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{transaction.description || (transaction.type === 'credit' ? 'Deposit' : 'Withdrawal')}</p>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border-2 ${
-                                  transaction.status === 'completed' 
-                                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' 
-                                    : transaction.status === 'failed' 
-                                    ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-100 dark:border-red-500/20' 
-                                    : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-500/20 animate-pulse'
-                                }`}
-                              >
-                                {transaction.status === 'completed' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                                {transaction.status === 'failed' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                {transaction.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                                {transaction.status.toUpperCase()}
-                              </Badge>
+                <div className="overflow-x-auto">
+                    <Table>
+                    <TableHeader className="bg-gray-50/50 border-none">
+                        <TableRow className="hover:bg-transparent border-none">
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-gray-400 pl-8">Transaction</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-gray-400">Date</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-gray-400">Status</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-gray-400 text-right pr-8">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredTransactions.map((tx) => (
+                        <TableRow key={tx.id} className="group border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                            <TableCell className="pl-8 py-4">
+                            <div className="flex items-center gap-4">
+                                {getTransactionIcon(tx.type, tx.reference_type)}
+                                <div>
+                                <p className="text-sm font-black text-gray-900 leading-none mb-1">{tx.description || (tx.type === 'credit' ? 'Deposit' : 'Withdrawal')}</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{tx.reference_type}</p>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3 text-xs">
-                              <span className="text-gray-400 font-bold">{format(new Date(transaction.created_at), 'MMM dd, yyyy • h:mm a')}</span>
-                              <span className="text-gray-300 dark:text-gray-700">•</span>
-                              <span className="text-gray-500 dark:text-gray-400 font-extrabold capitalize tracking-tight px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 rounded-md">{transaction.reference_type}</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Amount with Up/Down Indicator */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-black text-lg transition-all group-hover:translate-x-[-4px] ${
-                            transaction.type === 'credit' 
-                              ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                              : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                          }`}>
-                            <span>
-                              {transaction.type === 'credit' ? '+' : '-'} {wallet?.currency} {transaction.amount.toLocaleString()}
-                            </span>
-                            <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all text-gray-400" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                            </TableCell>
+                            <TableCell>
+                            <p className="text-xs font-bold text-gray-600">{format(new Date(tx.created_at), 'MMM dd, yyyy')}</p>
+                            <p className="text-[10px] text-gray-400">{format(new Date(tx.created_at), 'HH:mm')}</p>
+                            </TableCell>
+                            <TableCell>
+                            <Badge className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider border pointer-events-none shadow-none ${getStatusColor(tx.status)}`}>
+                                {tx.status}
+                            </Badge>
+                            </TableCell>
+                            <TableCell className="text-right pr-8">
+                            <p className={`text-sm font-black ${tx.type === 'credit' ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                {tx.type === 'credit' ? '+' : '-'}{wallet.currency} {tx.amount.toLocaleString()}
+                            </p>
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
                 </div>
               )}
             </CardContent>

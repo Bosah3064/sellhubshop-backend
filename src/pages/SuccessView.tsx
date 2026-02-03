@@ -126,8 +126,8 @@ export function SuccessView({ cart, currentOrderId, paymentMethod, groupedItems,
                 onClick={() => {
                     try {
                         const total = Math.ceil(getTotal() + getTotalDeliveryFee());
-                        const itemsList = cart?.map((i: any) => `📦 ${i.quantity}x ${i.name}`).join('%0A') || "Items";
-                        const message = `*🧾 ORDER CONFIRMED!* %0A*ID:* ${currentOrderId?.slice(0,8).toUpperCase()}%0A*Total:* KES ${total}%0A%0A${itemsList}%0A%0A_Checking on delivery status..._`;
+                        const itemsList = cart?.map((i: any) => `➡️ ${i.quantity}x ${i.name}`).join('%0A') || "Items";
+                        const message = `*👋 Hi! I just placed an order on SellHub!*%0A%0A*Order ID:* #${currentOrderId?.slice(0,8).toUpperCase()}%0A*Total:* KES ${total}%0A%0A*Items:*%0A${itemsList}%0A%0A_Please let me know once you've received it!_`;
                         window.open(`https://wa.me/?text=${message}`, '_blank');
                     } catch(e) {}
                 }}
@@ -137,7 +137,5 @@ export function SuccessView({ cart, currentOrderId, paymentMethod, groupedItems,
         </div>
       </CardContent>
     </Card>
-  );
-}
   );
 }

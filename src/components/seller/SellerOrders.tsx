@@ -236,6 +236,7 @@ export function SellerOrders() {
       case 'pending': return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 rounded-full px-3">Pending</Badge>;
       case 'cancelled': return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200 rounded-full px-3">Cancelled</Badge>;
       case 'processing': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 rounded-full px-3">Paid (Processing)</Badge>;
+      case 'shipped': return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200 rounded-full px-3">Shipped</Badge>;
       default: return <Badge variant="secondary" className="capitalize">{status}</Badge>;
     }
   };
