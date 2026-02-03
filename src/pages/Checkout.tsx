@@ -629,6 +629,7 @@ export default function Checkout() {
                             getTotal={getTotal}
                             getTotalDeliveryFee={getTotalDeliveryFee}
                             navigate={navigate}
+                            clearCart={clearCart}
                         />
                     </div>
                 ) : (
