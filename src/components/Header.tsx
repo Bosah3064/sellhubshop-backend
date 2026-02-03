@@ -150,13 +150,21 @@ const useUnreadCounts = (userId: string | null) => {
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT", // Explicitly listen for INSERTs to trigger sound
           schema: "public",
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
         () => {
           fetchUnreadCounts();
+          // Create and play sound
+          try {
+             const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"); // Subtle 'ping' sound
+             audio.volume = 0.5;
+             audio.play().catch(e => console.log("Audio play blocked", e));
+          } catch (e) {
+             console.error("Audio error", e);
+          }
         }
       )
       .subscribe();
@@ -421,11 +429,13 @@ const CompactUserActions = ({
   unreadCounts,
   onSignOut,
   avatarUrl,
+  userFullName,
 }: {
   user: User;
   unreadCounts: UnreadCounts;
   onSignOut: () => void;
   avatarUrl?: string | null;
+  userFullName?: string | null;
 }) => {
   const navigate = useNavigate();
   const { getItemCount } = useCart();
@@ -498,9 +508,7 @@ const CompactUserActions = ({
           <DropdownMenuLabel className="pb-1">
             <div className="flex flex-col space-y-0.5">
               <p className="font-semibold text-gray-800 text-xs truncate">
-                {user.user_metadata?.full_name ||
-                  user.user_metadata?.name ||
-                  "Welcome!"}
+                {userFullName || user.email || "Welcome!"}
               </p>
               <p className="text-xs text-gray-500 truncate">{user.email}</p>
               <Badge
@@ -603,6 +611,7 @@ const UserActions = ({
   onRefreshCounts,
   onSignOut,
   avatarUrl,
+  userFullName,
 }: {
   user: User;
   unreadCounts: UnreadCounts;
@@ -610,6 +619,7 @@ const UserActions = ({
   onRefreshCounts: () => void;
   onSignOut: () => void;
   avatarUrl?: string | null;
+  userFullName?: string | null;
 }) => {
   const navigate = useNavigate();
   const { getItemCount } = useCart();
@@ -716,9 +726,7 @@ const UserActions = ({
             </div>
             <div className="hidden lg:flex flex-col items-start">
               <span className="text-xs font-medium text-gray-800 max-w-20 truncate">
-                {user.user_metadata?.full_name ||
-                  user.user_metadata?.name ||
-                  "Account"}
+                {userFullName || user.email || "Account"}
               </span>
               <span className="text-xs text-gray-500 flex items-center gap-0.5">
                 <Crown className="h-2.5 w-2.5 text-amber-500" />
@@ -735,9 +743,7 @@ const UserActions = ({
           <DropdownMenuLabel className="pb-2">
             <div className="flex flex-col space-y-1">
               <p className="font-semibold text-gray-800 text-sm truncate">
-                {user.user_metadata?.full_name ||
-                  user.user_metadata?.name ||
-                  "Welcome!"}
+                {userFullName || user.email || "Welcome!"}
               </p>
               <p className="text-xs text-gray-500 truncate">{user.email}</p>
               <div className="flex gap-1">
@@ -1182,6 +1188,7 @@ const TrustIndicators = memo(() => (
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -1229,17 +1236,21 @@ export default function Header() {
     async function getProfile() {
       if (!user) {
         setAvatarUrl(null);
+        setUserFullName(null);
         return;
       }
       try {
         const { data } = await supabase
           .from("profiles")
-          .select("avatar_url")
+          .select("avatar_url, full_name")
           .eq("id", user.id)
           .single();
-        if (data) setAvatarUrl(data.avatar_url);
+        if (data) {
+          setAvatarUrl(data.avatar_url);
+          setUserFullName(data.full_name);
+        }
       } catch (error) {
-        console.error("Error loading avatar:", error);
+        console.error("Error loading profile:", error);
       }
     }
     getProfile();
@@ -1290,6 +1301,7 @@ export default function Header() {
                   onRefreshCounts={refreshCounts}
                   onSignOut={handleSignOut}
                   avatarUrl={avatarUrl}
+                  userFullName={userFullName}
                 />
               ) : (
                 <GuestActions />
@@ -1304,6 +1316,7 @@ export default function Header() {
                   unreadCounts={unreadCounts}
                   onSignOut={handleSignOut}
                   avatarUrl={avatarUrl}
+                  userFullName={userFullName}
                 />
               )}
               {!user && (

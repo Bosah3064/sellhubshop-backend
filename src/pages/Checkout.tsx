@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
+import confetti from 'canvas-confetti';
 import { useNavigate } from "react-router-dom";
+import { SuccessView } from "./SuccessView";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/providers/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { CheckCircle2 } from "lucide-react"; // Import CheckCircle2 here explicitly if not present
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Truck, ShieldCheck, CreditCard, ChevronRight, Plus, Check, History } from "lucide-react";
+import { MapPin, Truck, ShieldCheck, CreditCard, ChevronRight, Plus, Check, History, MessageCircle, PartyPopper } from "lucide-react";
 import { toast } from "sonner";
 
 interface Address {
@@ -29,6 +32,8 @@ interface LocationNode {
 
 export default function Checkout() {
   const navigate = useNavigate();
+
+
   const { cart, getTotal, clearCart } = useCart();
   const { user } = useAuth();
   
@@ -52,6 +57,77 @@ export default function Checkout() {
   const [selectedCounty, setSelectedCounty] = useState("");
   const [sellerProfile, setSellerProfile] = useState<any>(null);
   const [isManualCity, setIsManualCity] = useState(false);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
+
+  /* -------------------------------------------------------------------------- */
+  /*                        Multi-Seller Logic Implementation                   */
+  /* -------------------------------------------------------------------------- */
+  
+  // Group cart items by seller
+  const groupedItems = React.useMemo(() => {
+    const groups: Record<string, typeof cart> = {};
+    cart.forEach(item => {
+      if (!groups[item.seller_id]) groups[item.seller_id] = [];
+      groups[item.seller_id].push(item);
+    });
+    return groups;
+  }, [cart]);
+
+  const [sellerProfiles, setSellerProfiles] = useState<Record<string, any>>({});
+  const [deliveryFees, setDeliveryFees] = useState<Record<string, number>>({});
+
+  const fetchAllSellerProfiles = async () => {
+    const sellerIds = Object.keys(groupedItems);
+    if (sellerIds.length === 0) return;
+
+    console.log("Fetching profiles for sellers:", sellerIds);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', sellerIds);
+    
+    if (error) {
+      console.error("Error fetching seller profiles:", error);
+    }
+      
+    if (data) {
+      const profilesMap: Record<string, any> = {};
+      data.forEach(p => profilesMap[p.id] = p);
+      setSellerProfiles(profilesMap);
+    }
+  };
+
+  const calculateAllDeliveryFees = (buyerRegion: string) => {
+    const newFees: Record<string, number> = {};
+    const normalizedBuyerRegion = buyerRegion.toLowerCase().trim();
+
+    Object.keys(groupedItems).forEach(sellerId => {
+       const profile = sellerProfiles[sellerId];
+       if (!profile) {
+           // Fallback if profile not loaded
+           newFees[sellerId] = buyerRegion === "Nairobi" ? 200 : 450;
+           return;
+       }
+
+       const businessLocation = profile.business_location || "Nairobi";
+       const localFee = Number(profile.local_delivery_fee) || 200;
+       const outsideFee = Number(profile.outside_delivery_fee) || 350;
+       const normalizedBizLoc = businessLocation.toLowerCase().trim();
+
+       if (normalizedBuyerRegion.includes(normalizedBizLoc) || normalizedBizLoc.includes(normalizedBuyerRegion)) {
+           newFees[sellerId] = localFee;
+       } else {
+           newFees[sellerId] = outsideFee;
+       }
+    });
+
+    setDeliveryFees(newFees);
+  };
+
+  const getTotalDeliveryFee = () => Object.values(deliveryFees).reduce((a, b) => a + b, 0);
+
   useEffect(() => {
     if (cart.length === 0) {
       navigate("/cart");
@@ -59,18 +135,20 @@ export default function Checkout() {
     }
     fetchAddresses();
     fetchCounties();
-    fetchSellerProfile();
+    fetchSellerProfile(); // Keep for backward compatibility
+    fetchAllSellerProfiles(); // Multi-seller
   }, [cart, navigate]);
 
-  // Re-calculate fee whenever address or profile changes
+  // Re-calculate fees whenever address or profiles change
   useEffect(() => {
-    if (selectedAddressId) {
+    if (selectedAddressId && Object.keys(sellerProfiles).length > 0) {
        const addr = addresses.find(a => a.id === selectedAddressId);
        if (addr) {
-         calculateDeliveryFee(addr.region);
+         calculateAllDeliveryFees(addr.region);
+         calculateDeliveryFee(addr.region); // Keep for backward compatibility
        }
     }
-  }, [selectedAddressId, sellerProfile, addresses]);
+  }, [selectedAddressId, sellerProfiles, sellerProfile, addresses]);
 
   const fetchCounties = async () => {
     const { data, error } = await supabase
@@ -204,16 +282,35 @@ export default function Checkout() {
     calculateDeliveryFee(region);
   };
 
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
 
-  /* -------------------------------------------------------------------------- */
-  /*                             Payment Validation                             */
-  /* -------------------------------------------------------------------------- */
-  const [waitingForPayment, setWaitingForPayment] = useState(false);
-  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
-  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
+  // SMART POLLING: Check for payment status while modal is open
+  useEffect(() => {
+    if (!waitingForPayment || !currentOrderId) return;
+    
+    const checkPayment = async () => {
+       try {
+          const { data } = await supabase
+             .from('marketplace_orders')
+             .select('payment_status')
+             .eq('id', currentOrderId)
+             .single();
+             
+          if (data && data.payment_status === 'paid') {
+              toast.success("Payment Received!");
+              setPaymentStatus('success');
+              setWaitingForPayment(false);
+          }
+       } catch (e) {
+         // Silent fail on poll error
+       }
+    };
+    
+    const interval = setInterval(checkPayment, 3000); // Check every 3s
+    return () => clearInterval(interval);
+  }, [waitingForPayment, currentOrderId]);
 
-  // Realtime subscription for payment confirmation
+
   useEffect(() => {
     if (!waitingForPayment || !currentOrderId) return;
 
@@ -237,10 +334,7 @@ export default function Checkout() {
             toast.success("Payment Received! Completing order...");
             setWaitingForPayment(false);
             setPaymentStatus('success');
-            setTimeout(() => {
-                clearCart();
-                navigate("/dashboard");
-            }, 1000);
+            clearCart();
           } else if (newStatus === 'failed' || newStatus === 'cancelled') {
              setWaitingForPayment(false);
              setPaymentStatus('failed');
@@ -280,7 +374,6 @@ export default function Checkout() {
              setWaitingForPayment(false);
              setPaymentStatus('success');
              clearCart();
-             navigate("/dashboard");
              return;
         } else if (result.errorCode) {
              // Safaricom logic has not completed yet or error
@@ -318,59 +411,73 @@ export default function Checkout() {
     setPaymentStatus('processing');
     
     try {
-      // 1. Create Order
-      const { data: order, error: orderError } = await (supabase
-        .from("marketplace_orders") as any)
-        .insert([{
-          buyer_id: user.id,
-          total_amount: Math.ceil(getTotal() + deliveryFee),
-          delivery_address_id: selectedAddressId,
-          delivery_fee: deliveryFee,
-          payment_method: paymentMethod,
-          status: 'pending' // Initial status
-        }])
-        .select()
-        .single();
+      const sellerIds = Object.keys(groupedItems);
+      const createdOrderIds: string[] = [];
 
-      if (orderError) throw orderError;
-      console.log("Order created:", order.id);
-      setCurrentOrderId(order.id);
+      // 1. Create Multiple Orders (One per Seller)
+      for (const sellerId of sellerIds) {
+          const items = groupedItems[sellerId];
+          const sellerFee = deliveryFees[sellerId] || 0;
+          const subtotal = items.reduce((sum, i) => sum + (i.price * (i.quantity || 1)), 0);
+          const totalForSeller = Math.ceil(subtotal + sellerFee);
 
-      // 2. Create Order Items
-      const orderItems = cart.map(item => ({
-        order_id: order.id,
-        product_id: item.id,
-        seller_id: item.seller_id,
-        quantity: item.quantity || 1,
-        price_at_purchase: item.price,
-        total_price: item.price * (item.quantity || 1)
-      }));
+          const { data: order, error: orderError } = await (supabase
+            .from("marketplace_orders") as any)
+            .insert([{
+              buyer_id: user.id,
+              total_amount: totalForSeller,
+              delivery_address_id: selectedAddressId,
+              delivery_fee: sellerFee,
+              payment_method: paymentMethod,
+              status: 'pending' // Initial status
+            }])
+            .select()
+            .single();
 
-      const { error: itemsError } = await (supabase
-        .from("order_items") as any)
-        .insert(orderItems);
+          if (orderError) throw orderError;
+          createdOrderIds.push(order.id);
 
-      if (itemsError) throw itemsError;
+          // 2. Create Order Items for this Seller's Order
+          const orderItems = items.map(item => ({
+            order_id: order.id,
+            product_id: item.id,
+            seller_id: item.seller_id,
+            quantity: item.quantity || 1,
+            price_at_purchase: item.price,
+            total_price: item.price * (item.quantity || 1)
+          }));
+
+          const { error: itemsError } = await (supabase
+            .from("order_items") as any)
+            .insert(orderItems);
+
+          if (itemsError) throw itemsError;
+      }
+      
+      if (createdOrderIds.length > 0) {
+          setCurrentOrderId(createdOrderIds[0]); // Listen to the first one for updates
+      }
 
       // 3. Handle Payment Initiation
       if (paymentMethod === 'mpesa') {
-        toast.info("Order placed! Initiating M-Pesa STK Push...");
+        toast.info("Orders placed! Initiating M-Pesa STK Push...");
         
-        // Get phone number from address or profile
+        // Get phone number from address
         const addr = addresses.find(a => a.id === selectedAddressId);
         const phoneToBill = addr?.phone_number || ""; 
+        const grandTotal = Math.ceil(getTotal() + getTotalDeliveryFee());
 
         try {
-            // Call Backend for STK Push
+            // Call Backend for STK Push - Using the First Order ID as the Reference
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/v1/stk-push`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    amount: Math.ceil(getTotal() + deliveryFee), 
+                    amount: grandTotal, 
                     phone: phoneToBill,
-                    accountRef: order.id, 
-                    description: `Order #${order.id.substring(0, 8)}`,
-                    orderId: order.id 
+                    accountRef: createdOrderIds[0], // Only one ref allowed
+                    description: `Order Bundle (${createdOrderIds.length})`,
+                    orderId: createdOrderIds[0] 
                 })
             });
 
@@ -379,9 +486,8 @@ export default function Checkout() {
 
             if (result.ResponseCode === "0") {
                 toast.success("STK Push sent! Please check your phone.");
-                setCheckoutRequestId(result.CheckoutRequestID); // Store ID for verification
-                setWaitingForPayment(true); // Enable waiting state
-                // DO NOT redirect here. Wait for Realtime or Manual check.
+                setCheckoutRequestId(result.CheckoutRequestID); 
+                setWaitingForPayment(true);
             } else {
                 toast.error("M-Pesa request failed: " + (result.errorMessage || "Unknown error"));
                 setPaymentStatus('failed');
@@ -393,28 +499,66 @@ export default function Checkout() {
         }
 
       } else {
-        // Wallet payment logic (unchanged)
+        // Wallet payment logic - Pay EACH order individually
         toast.info("Processing wallet payment...");
-        
-        const { data: rpcData, error: rpcError } = await supabase.rpc('pay_order_via_wallet', {
-            p_order_id: order.id,
-            p_buyer_id: user.id
-        });
+        let successCount = 0;
 
-        if (rpcError) {
-             console.error("Wallet Payment Error:", rpcError);
-             toast.error("Wallet payment failed. Please try again.");
-             setPaymentStatus('failed');
-        } else {
-            console.log("Wallet Payment Result:", rpcData);
-            if (rpcData.success) {
-                toast.success("Payment successful! Order completed.");
-                clearCart();
-                navigate("/dashboard");
+        for (const oId of createdOrderIds) {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('pay_order_via_wallet', {
+                p_order_id: oId,
+                p_buyer_id: user.id
+            });
+
+            const response: any = rpcData; // Handle 'unknown' type
+            
+            if (!rpcError && response?.success) {
+                successCount++;
             } else {
-                toast.error("Payment failed: " + rpcData.message);
-                setPaymentStatus('failed');
+                console.error(`Wallet Payment Failed for Order ${oId}`, rpcError || response);
             }
+        }
+
+        if (successCount === createdOrderIds.length) {
+            toast.success("Payment confirmed! Sellers notified.");
+            setPaymentStatus('success');
+            
+            // Update Order Status to 'processing' so it appears as "Completed/Paid" to seller
+            await Promise.all(createdOrderIds.map(oId => 
+               supabase.from('marketplace_orders').update({ 
+                 status: 'processing', 
+                 payment_status: 'paid' 
+               }).eq('id', oId)
+            ));
+
+            // Notify Sellers Automatically (Real Insert)
+            const sellers = Object.keys(groupedItems);
+            Promise.all(sellers.map(async (sellerId) => {
+               try {
+                   await supabase.from('notifications').insert({
+                       user_id: sellerId,
+                       title: 'New Order Received!',
+                       message: `Order #${createdOrderIds[0]?.slice(0,8)} has been placed. Check your orders tab.`,
+                       type: 'order', // Assuming 'type' column exists, otherwise 'system'
+                       is_read: false
+                   });
+                   console.log(`[System] Notification inserted for seller ${sellerId}`);
+               } catch (err) {
+                   console.error("Failed to insert notification", err);
+               }
+            }));
+
+            // Play Success Sound
+            try {
+               const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"); // Success chime
+               audio.volume = 0.6;
+               audio.play();
+            } catch(e) {}
+        } else if (successCount > 0) {
+            toast.warning(`Partial payment success (${successCount}/${createdOrderIds.length} orders). Contact support.`);
+            setPaymentStatus('failed'); // Show fail or partial state
+        } else {
+             toast.error("Wallet payment failed completely.");
+             setPaymentStatus('failed');
         }
       }
     } catch (error: any) {
@@ -435,19 +579,24 @@ export default function Checkout() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
             <Card className="max-w-md w-full animate-in zoom-in-95 shadow-2xl">
                 <CardHeader className="text-center pb-2">
-                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <div className="mx-auto relative w-24 h-24 mb-4 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping"></div>
+                        <div className="absolute inset-2 bg-green-500/30 rounded-full animate-pulse"></div>
+                        <div className="relative bg-white rounded-full p-4 shadow-xl border-4 border-green-500">
+                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                        </div>
                     </div>
-                    <CardTitle className="text-xl">Waiting for Payment</CardTitle>
-                    <CardDescription>
-                        Please check your phone (<b>{addresses.find(a => a.id === selectedAddressId)?.phone_number}</b>).
-                        <br />
-                        Enter your M-Pesa PIN to complete the transaction.
+                    <CardTitle className="text-2xl font-black text-green-700">Scanning Network...</CardTitle>
+                    <CardDescription className="text-base font-medium text-gray-600">
+                        Connecting to {addresses.find(a => a.id === selectedAddressId)?.phone_number}...
+                        <br/>
+                        <span className="text-xs text-muted-foreground font-mono mt-1 block">ID: {currentOrderId?.slice(0,8).toUpperCase()}</span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
-                    <div className="bg-muted/50 p-4 rounded-lg text-sm text-center">
-                        <p className="text-muted-foreground">Once you pay, this screen will automatically close.</p>
+                    <div className="bg-green-50 p-4 rounded-xl border border-green-100 text-sm text-center">
+                        <p className="font-semibold text-green-800 mb-1">Please enter your M-Pesa PIN</p>
+                        <p className="text-green-600 text-xs">Waiting for confirmation signal...</p>
                     </div>
                     
                     <Button 
@@ -468,7 +617,21 @@ export default function Checkout() {
             </Card>
         </div>
       )}
-
+      {/* SUCCESS VIEW - Smart Celebration & WhatsApp */}
+      {paymentStatus === 'success' ? (
+                    <div className="container mx-auto px-4 max-w-2xl py-12 text-center animate-in zoom-in-95 duration-500">
+                        <SuccessView 
+                            cart={cart}
+                            currentOrderId={currentOrderId} 
+                            paymentMethod={paymentMethod}
+                            groupedItems={groupedItems}
+                            user={user}
+                            getTotal={getTotal}
+                            getTotalDeliveryFee={getTotalDeliveryFee}
+                            navigate={navigate}
+                        />
+                    </div>
+                ) : (
       <div className="container mx-auto px-4 max-w-4xl">
         <h1 className="text-3xl font-black mb-8">Checkout</h1>
 
@@ -807,6 +970,7 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -457,7 +457,7 @@ export default function Marketplace() {
     initializeBasicSecurity();
     loadCurrentUserProfile();
     fetchCounties();
-    // loadProducts(); -> Moved to filter effect
+    loadProducts(); // Fixed: Re-enabled initial product loading
     loadUserFavorites();
 
     // Initial sync from URL (redundant due to above useEffect, but ensures clean start if needed)
@@ -735,7 +735,7 @@ export default function Marketplace() {
       loadProducts();
     }, 500); // 500ms debounce
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedCategory, priceRange, countyFilter, neighborhoodFilter, conditionFilter, verifiedOnly]);
+  }, [searchQuery, selectedCategory, priceRange, countyFilter, neighborhoodFilter, conditionFilter, verifiedOnly, sortBy]);
 
   // Effect for Search Suggestions
   useEffect(() => {
@@ -2413,12 +2413,13 @@ export default function Marketplace() {
             ref={modalContentRef}
           >
             {/* Explicit Close Button */}
+            {/* Explicit Close Button with Glass Effect */}
             <button 
                 onClick={handleCloseProductModal}
-                className="absolute top-4 right-4 z-50 p-2 bg-black/5 hover:bg-black/10 rounded-full transition-colors"
+                className="absolute top-6 right-6 z-50 p-2.5 bg-white/80 backdrop-blur-md border border-white/20 hover:bg-white shadow-lg hover:shadow-xl rounded-full transition-all duration-300 hover:scale-110 group"
                 aria-label="Close"
             >
-                <X className="h-6 w-6 text-gray-500 hover:text-gray-900" />
+                <X className="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" />
             </button>
             {selectedProduct && (
               <div className="animate-in fade-in zoom-in-95 duration-500">
@@ -2572,41 +2573,46 @@ export default function Marketplace() {
                     <div className="lg:col-span-5 p-6 sm:p-12 space-y-10">
                       
                       {/* Price Card */}
-                      <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-3xl -mr-16 -mt-16" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-2 block">Premium Listing</span>
-                        <div className="flex items-baseline gap-2 mb-2">
-                           <span className="text-4xl sm:text-5xl font-black">KES {selectedProduct.price?.toLocaleString()}</span>
+                      <div className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] -mr-32 -mt-32 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 blur-[100px] -ml-32 -mb-32 pointer-events-none" />
+                        
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 mb-3 block opacity-90">Premium Listing</span>
+                        <div className="flex items-baseline gap-3 mb-2 relative z-10">
+                           <span className="text-4xl sm:text-5xl font-black tracking-tight">KES {selectedProduct.price?.toLocaleString()}</span>
                         </div>
                         {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (
-                           <div className="flex items-center gap-3">
-                              <span className="text-gray-400 line-through font-medium">KES {selectedProduct.original_price.toLocaleString()}</span>
-                              <Badge className="bg-emerald-500 text-[10px] font-black border-none px-2 h-5">-{Math.round((1 - selectedProduct.price/selectedProduct.original_price) * 100)}% OFF</Badge>
+                           <div className="flex items-center gap-3 relative z-10">
+                              <span className="text-gray-400 line-through font-medium lg:text-lg">KES {selectedProduct.original_price.toLocaleString()}</span>
+                              <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black px-2.5 h-6 rounded-lg uppercase tracking-wider">-{Math.round((1 - selectedProduct.price/selectedProduct.original_price) * 100)}% Save</Badge>
                            </div>
                         )}
-                        <div className="mt-6 flex flex-wrap gap-2">
-                           {selectedProduct.is_negotiable && <Badge className="bg-white/10 text-white border-white/20 text-[10px] uppercase font-black">Negotiable</Badge>}
-                           <Badge className="bg-white/10 text-white border-white/20 text-[10px] uppercase font-black">{selectedProduct.condition?.replace(/-/g, ' ')}</Badge>
+                        <div className="mt-8 flex flex-wrap gap-2 relative z-10">
+                           {selectedProduct.is_negotiable && <Badge className="bg-white/5 backdrop-blur-md text-white border border-white/10 text-[10px] uppercase font-black hover:bg-white/10 transition-colors py-1.5 px-3">Negotiable</Badge>}
+                           <Badge className="bg-white/5 backdrop-blur-md text-white border border-white/10 text-[10px] uppercase font-black hover:bg-white/10 transition-colors py-1.5 px-3">{selectedProduct.condition?.replace(/-/g, ' ')}</Badge>
                         </div>
                       </div>
 
                       {/* AI Price Insight Widget */}
-                      <div className="p-6 bg-emerald-50/50 border border-emerald-100/50 rounded-[2rem] space-y-4">
+                      <div className="p-6 bg-emerald-50/30 border border-emerald-100 rounded-[2rem] space-y-4 hover:border-emerald-200 transition-colors">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-emerald-100 rounded-full">
-                                    <TrendingDown className="h-4 w-4 text-emerald-600" />
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-white shadow-sm border border-emerald-50 rounded-xl">
+                                    <TrendingDown className="h-5 w-5 text-emerald-500" />
                                 </div>
-                                <span className="text-sm font-black text-emerald-900">AI Price Analysis</span>
+                                <div>
+                                    <h4 className="text-sm font-black text-gray-900">Price Insight</h4>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">AI Analysis</p>
+                                </div>
                             </div>
-                            <Badge className="bg-emerald-500 text-white text-[10px] uppercase tracking-wider px-2 py-1 font-bold border-none">Great Deal</Badge>
+                            <Badge className="bg-emerald-500 text-white text-[10px] uppercase tracking-wider px-3 py-1.5 font-black border-none shadow-lg shadow-emerald-500/20">Great Deal</Badge>
                         </div>
-                        <p className="text-xs text-emerald-800 leading-relaxed font-medium">
-                            Based on our AI market scan, this item is priced <span className="font-extrabold text-emerald-600">12% lower</span> than the average for similar items in {selectedProduct.location || "this region"}.
+                        <p className="text-xs text-gray-600 leading-relaxed font-medium pl-1">
+                            Market scan indicates this is priced <span className="font-black text-emerald-600">12% lower</span> than similar {selectedProduct.category} items in {selectedProduct.location || "your area"}.
                         </p>
                         
                         {/* Simulated Price History Chart */}
-                        <div className="h-24 w-full mt-2">
+                        <div className="h-28 w-full mt-4 bg-white/50 rounded-xl p-2 border border-emerald-50">
                             <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={[
                                 { date: format(subDays(new Date(), 30), "MMM d"), price: (selectedProduct.price || 0) * 1.2 },
@@ -2621,7 +2627,7 @@ export default function Marketplace() {
                                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                                 </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0fdf4" />
                                 <XAxis dataKey="date" hide />
                                 <YAxis hide domain={['dataMin - 100', 'dataMax + 100']} />
                                 <RechartsTooltip 
@@ -2639,7 +2645,7 @@ export default function Marketplace() {
                             </AreaChart>
                             </ResponsiveContainer>
                         </div>
-                        <div className="flex justify-between text-[10px] text-emerald-400 font-bold px-1 uppercase tracking-wide">
+                        <div className="flex justify-between text-[10px] text-gray-300 font-bold px-1 uppercase tracking-wider">
                             <span>30 days ago</span>
                             <span>Today</span>
                         </div>
@@ -2647,12 +2653,19 @@ export default function Marketplace() {
 
                       {/* Action Grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                         <Button className="h-16 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-lg shadow-xl shadow-primary/20" onClick={() => { setProductDetailModalOpen(false); openContact(selectedProduct); }}>
-                            <Phone className="w-6 h-6 mr-3" />
+                         <Button 
+                            className="h-16 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-black text-lg shadow-[0_10px_40px_-10px_rgba(16,185,129,0.5)] hover:shadow-[0_20px_40px_-10px_rgba(16,185,129,0.6)] hover:-translate-y-1 transition-all duration-300 border-none" 
+                            onClick={() => { setProductDetailModalOpen(false); openContact(selectedProduct); }}
+                         >
+                            <Phone className="w-6 h-6 mr-3 animate-pulse" />
                             Contact Now
                          </Button>
-                         <Button variant="outline" className="h-16 rounded-2xl border-2 border-gray-100 hover:bg-gray-50 font-black text-lg" onClick={() => addToCart(selectedProduct)}>
-                            <ShoppingCart className="w-6 h-6 mr-3 text-secondary" />
+                         <Button 
+                            variant="outline" 
+                            className="h-16 rounded-2xl border-2 border-gray-100 bg-white hover:bg-gray-50 hover:border-gray-200 text-gray-900 font-black text-lg hover:-translate-y-1 transition-all duration-300 shadow-sm hover:shadow-lg" 
+                            onClick={() => addToCart(selectedProduct)}
+                         >
+                            <ShoppingCart className="w-6 h-6 mr-3 text-gray-900" />
                             To Cart
                          </Button>
                       </div>

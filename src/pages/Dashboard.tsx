@@ -28,6 +28,7 @@ import {
   Sparkles,
   Link as LinkIcon,
   Users,
+  Share2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +48,9 @@ import {
 import { format, subDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarketInsights } from "@/components/seller/MarketInsights";
+import { ShareProductDialog } from "@/components/social/ShareProductDialog";
+import { SellerOrders } from "@/components/seller/SellerOrders";
+import { BuyerOrders } from "@/components/dashboard/BuyerOrders";
 
 interface DashboardStats {
   totalProducts: number;
@@ -585,13 +589,33 @@ export default function Dashboard() {
 
       {/* Dashboard Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="market-insights" className="gap-2">
-            Market Insights <Sparkles className="h-3 w-3 text-amber-500" />
-          </TabsTrigger>
+          <TabsTrigger value="purchases">My Purchases</TabsTrigger>
+          <TabsTrigger value="market-insights">Market Insights</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="orders">Seller Orders</TabsTrigger>
         </TabsList>
+
+        {/* TAB: ORDERS - Smart Order Management */}
+        <TabsContent value="orders" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="border-none shadow-none bg-transparent">
+             <CardHeader className="px-0 pt-0">
+               <div className="flex justify-between items-center">
+                 <div>
+                   <CardTitle>Order Management</CardTitle>
+                   <CardDescription>Track and manage your customer orders efficiently.</CardDescription>
+                 </div>
+                 {/* Smart Badge for pending orders could go here */}
+               </div>
+             </CardHeader>
+             <CardContent className="px-0">
+               <SellerOrders />
+             </CardContent>
+          </Card>
+        </TabsContent>
+
+
 
         {/* TAB 1: OVERVIEW */}
         <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -972,6 +996,10 @@ export default function Dashboard() {
            <MarketInsights />
         </TabsContent>
 
+        <TabsContent value="purchases" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+           <BuyerOrders />
+        </TabsContent>
+
         {/* TAB 3: PRODUCTS */}
         <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Card className="hover:shadow-lg transition-shadow">
@@ -1150,6 +1178,20 @@ const ProductCard = ({
         </Badge>
 
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <ShareProductDialog 
+            trigger={
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-500 hover:text-primary">
+                <Share2 className="h-3 w-3" />
+              </Button>
+            }
+            product={{
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              description: product.description,
+              image: product.images?.[0]
+            }}
+          />
           <Button size="icon" variant="ghost" asChild className="h-8 w-8">
             <Link to={`/product/${product.id}`}>
               <Eye className="h-3 w-3" />
