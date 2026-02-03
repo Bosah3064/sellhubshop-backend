@@ -38,6 +38,10 @@ const adminRoutes = require('./endpoints/admin');
 app.use('/api/admin', adminRoutes);
 
 
+// WhatsApp Endpoint (Private Send)
+const whatsappRoutes = require('./endpoints/whatsapp');
+app.use('/api/whatsapp', whatsappRoutes);
+
 app.get('/', (req, res) => res.send('M-Pesa API Server is running'));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
