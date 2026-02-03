@@ -132,7 +132,7 @@ export function SellerOrders() {
       // Correct Query: Fetch Order Items for this seller, including parent Order details
 
       let query = supabase
-        .from("order_items")
+        .from("order_items" as any)
         .select(`
           id,
           product_id,
@@ -188,7 +188,7 @@ export function SellerOrders() {
       if (expiredOrders.length > 0) {
         console.log("Auto-cancelling expired orders:", expiredOrders.map(o => o.id));
         await Promise.all(expiredOrders.map(o => 
-           supabase.from('marketplace_orders').update({ status: 'cancelled' }).eq('id', o.id)
+           supabase.from('marketplace_orders' as any).update({ status: 'cancelled' }).eq('id', o.id)
         ));
         // Update local state to reflect cancellation immediately
         parsedOrders = parsedOrders.map(o => 
@@ -223,7 +223,7 @@ export function SellerOrders() {
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const { error } = await supabase
-        .from("marketplace_orders")
+        .from("marketplace_orders" as any)
         .update({ status: newStatus })
         .eq("id", orderId);
 
@@ -254,6 +254,7 @@ export function SellerOrders() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed': return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 rounded-full px-3">Completed</Badge>;
+      case 'delivered': return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200 rounded-full px-3">Arrived (Delivery)</Badge>;
       case 'pending': return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 rounded-full px-3">Pending</Badge>;
       case 'cancelled': return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200 rounded-full px-3">Cancelled</Badge>;
       case 'processing': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 rounded-full px-3">Paid (Processing)</Badge>;
@@ -448,7 +449,7 @@ export function SellerOrders() {
                                               <Button 
                                                 variant="outline"
                                                 className="flex-1 bg-green-600 hover:bg-green-700 text-white hover:text-white border-none font-bold shadow-sm" 
-                                                onClick={() => updateOrderStatus(order.id, 'completed')}
+                                                onClick={() => updateOrderStatus(order.id, 'delivered')}
                                               >
                                                 <Truck className="h-4 w-4 mr-2" />
                                                 Quick Delivered
@@ -458,11 +459,19 @@ export function SellerOrders() {
                                          {order.status === 'shipped' && (
                                              <Button 
                                                className="w-full bg-green-600 hover:bg-green-700 font-black h-12 shadow-lg" 
-                                               onClick={() => updateOrderStatus(order.id, 'completed')}
+                                               onClick={() => updateOrderStatus(order.id, 'delivered')}
                                              >
                                                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                Confirm Delivered
+                                                Mark as Delivered
                                              </Button>
+                                         )}
+                                         {order.status === 'delivered' && (
+                                             <div className="w-full bg-blue-50 p-3 rounded-lg border border-blue-100 text-center">
+                                                <p className="text-xs font-bold text-blue-700 flex items-center justify-center gap-2">
+                                                   <Clock className="w-4 h-4" />
+                                                   Awaiting Buyer Confirmation
+                                                </p>
+                                             </div>
                                          )}
                                      </div>
                                   </div>

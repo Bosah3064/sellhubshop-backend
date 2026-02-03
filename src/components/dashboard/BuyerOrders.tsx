@@ -70,7 +70,9 @@ export function BuyerOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  const currentOrder = orders.find(o => o.id === selectedOrderId);
 
   useEffect(() => {
     fetchOrders();
@@ -139,6 +141,22 @@ export function BuyerOrders() {
       toast.error("Failed to load your orders");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("marketplace_orders")
+        .update({ status: newStatus })
+        .eq("id", orderId);
+
+      if (error) throw error;
+      
+      toast.success(newStatus === 'completed' ? "Order confirmed! Thank you." : `Order marked as ${newStatus}`);
+      fetchOrders();
+    } catch (error) {
+      toast.error("Failed to update order");
     }
   };
 
@@ -233,6 +251,8 @@ export function BuyerOrders() {
                                                 order.status === 'cancelled' ? 'destructive' : 'outline'
                                             }
                                             className={
+                                                order.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200 border-green-200' :
+                                                order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200' :
                                                 order.status === 'processing' || order.payment_status === 'paid' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200' : 
                                                 order.status === 'shipped' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200' : ''
                                             }
@@ -245,80 +265,91 @@ export function BuyerOrders() {
                                     <TableCell className="text-right">
                                         <Dialog>
                                             <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
+                                                <Button variant="outline" size="sm" onClick={() => setSelectedOrderId(order.id)}>
                                                     Track Order
                                                 </Button>
                                             </DialogTrigger>
                                             <DialogContent className="max-w-2xl">
-                                                <DialogHeader>
-                                                    <DialogTitle className="flex items-center justify-between">
-                                                        <span>Order Tracking</span>
-                                                        <Badge variant="outline" className="font-mono">#{order.id.slice(0, 8)}</Badge>
-                                                    </DialogTitle>
-                                                </DialogHeader>
-                                                
-                                                <div className="py-6">
-                                                    {/* Stepper */}
-                                                    <div className="relative flex items-center justify-between px-4 mb-8">
-                                                        {/* Progress Line */}
-                                                        <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -z-10"></div>
-                                                        <div 
-                                                            className="absolute top-1/2 left-0 h-1 bg-green-500 transition-all duration-500 -z-10"
-                                                            style={{ width: `${((getStatusStep(order.status, order.payment_status) - 1) / 3) * 100}%` }}
-                                                        ></div>
+                                                {!currentOrder ? (
+                                                    <div className="p-8 text-center text-muted-foreground animate-pulse">Updating tracking data...</div>
+                                                ) : (
+                                                    <>
+                                                        <DialogHeader>
+                                                            <DialogTitle className="flex items-center justify-between">
+                                                                <span>Order Tracking</span>
+                                                                <Badge variant="outline" className="font-mono">#{currentOrder.id.slice(0, 8).toUpperCase()}</Badge>
+                                                            </DialogTitle>
+                                                        </DialogHeader>
+                                                        
+                                                        <div className="py-6">
+                                                            {/* Stepper */}
+                                                            <div className="relative flex items-center justify-between px-4 mb-8">
+                                                                {/* Progress Line */}
+                                                                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -z-10"></div>
+                                                                <div 
+                                                                    className="absolute top-1/2 left-0 h-1 bg-green-500 transition-all duration-500 -z-10"
+                                                                    style={{ width: `${((getStatusStep(currentOrder.status, currentOrder.payment_status) - 1) / 3) * 100}%` }}
+                                                                ></div>
 
-                                                        {[
-                                                            { step: 1, label: "Placed", icon: Receipt },
-                                                            { step: 2, label: "Paid/Processing", icon: CheckCircle2 },
-                                                            { step: 3, label: "Shipped", icon: Truck },
-                                                            { step: 4, label: "Delivered", icon: Package },
-                                                        ].map((s) => {
-                                                            const currentStep = getStatusStep(order.status, order.payment_status);
-                                                            const isCompleted = currentStep >= s.step;
-                                                            const isCurrent = currentStep === s.step;
+                                                                {[
+                                                                    { step: 1, label: "Placed", icon: Receipt },
+                                                                    { step: 2, label: "Paid/Processing", icon: CheckCircle2 },
+                                                                    { step: 3, label: "Shipped", icon: Truck },
+                                                                    { step: 4, label: "Delivered", icon: Package },
+                                                                ].map((s) => {
+                                                                    const currentStep = getStatusStep(currentOrder.status, currentOrder.payment_status);
+                                                                    const isCompleted = currentStep >= s.step;
+                                                                    const isCurrent = currentStep === s.step;
 
-                                                            return (
-                                                                <div key={s.step} className="flex flex-col items-center bg-white px-2">
-                                                                    <div className={`
-                                                                        w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300
-                                                                        ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-200 text-gray-300'}
-                                                                        ${isCurrent ? 'ring-4 ring-green-100 scale-110' : ''}
-                                                                    `}>
-                                                                        <s.icon className="w-5 h-5" />
-                                                                    </div>
-                                                                    <span className={`text-xs mt-2 font-medium ${isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
-                                                                        {s.label}
+                                                                    return (
+                                                                        <div key={s.step} className="flex flex-col items-center bg-white px-2">
+                                                                            <div className={`
+                                                                                w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300
+                                                                                ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-200 text-gray-300'}
+                                                                                ${isCurrent ? 'ring-4 ring-green-100 scale-110' : ''}
+                                                                            `}>
+                                                                                <s.icon className="w-5 h-5" />
+                                                                            </div>
+                                                                            <span className={`text-xs mt-2 font-medium ${isCompleted ? 'text-green-600' : 'text-gray-400'}`}>
+                                                                                {s.label}
+                                                                            </span>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+
+                                                            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-gray-500">Status:</span>
+                                                                    <span className="font-bold text-gray-900 border-b-2 border-green-200 uppercase tracking-tighter">
+                                                                        {currentOrder.status}
                                                                     </span>
                                                                 </div>
-                                                            )
-                                                        })}
-                                                    </div>
-
-                                                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-gray-500">Estimated Delivery:</span>
-                                                            <span className="font-medium text-gray-900">
-                                                                {order.status === 'delivered' ? 'Delivered' : 'Within 3-5 Business Days'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-gray-500">Shipping Method:</span>
-                                                            <span className="font-medium text-gray-900">Standard Delivery (Doorstep)</span>
-                                                        </div>
-                                                        {order.delivery_fee > 0 && (
-                                                            <div className="flex justify-between text-sm">
-                                                                <span className="text-gray-500">Delivery Fee:</span>
-                                                                <span className="font-medium text-gray-900">KES {order.delivery_fee}</span>
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-gray-500">Estimated Delivery:</span>
+                                                                    <span className="font-medium text-gray-900">
+                                                                        {currentOrder.status === 'delivered' || currentOrder.status === 'completed' ? 'Arrived!' : 'Within 3-5 Business Days'}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                        </div>
 
-                                                <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" onClick={() => window.open(`https://wa.me/?text=Hi, inquiring about my order #${order.id.slice(0,8)}`, '_blank')}>
-                                                        Contact Seller
-                                                    </Button>
-                                                </div>
+                                                        <div className="flex justify-end gap-2 pt-2 border-t mt-4">
+                                                            {(currentOrder.status === 'delivered' || currentOrder.status === 'shipped') && (
+                                                                <Button 
+                                                                    className="bg-green-600 hover:bg-green-700 text-white font-black px-6 shadow-lg shadow-green-100"
+                                                                    onClick={() => updateOrderStatus(currentOrder.id, 'completed')}
+                                                                >
+                                                                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                                                                    Confirm Received
+                                                                </Button>
+                                                            )}
+                                                            <Button variant="ghost" onClick={() => window.open(`https://wa.me/?text=Hi, inquiring about my order #${currentOrder.id.slice(0,8)}`, '_blank')}>
+                                                                Contact Seller
+                                                            </Button>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </DialogContent>
                                         </Dialog>
                                     </TableCell>
