@@ -74,6 +74,27 @@ export function BuyerOrders() {
 
   useEffect(() => {
     fetchOrders();
+
+    // ======= REALTIME SUBSCRIPTION =======
+    const channel = supabase
+      .channel('buyer-orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'marketplace_orders'
+        },
+        () => {
+          console.log("Realtime update: Refreshing buyer orders");
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchOrders = async () => {
@@ -207,14 +228,17 @@ export function BuyerOrders() {
                                         <Badge 
                                             variant={
                                                 order.status === 'completed' || order.status === 'delivered' ? 'default' :
+                                                order.status === 'shipped' ? 'secondary' :
                                                 order.status === 'processing' || order.payment_status === 'paid' ? 'secondary' :
                                                 order.status === 'cancelled' ? 'destructive' : 'outline'
                                             }
                                             className={
-                                                order.status === 'processing' || order.payment_status === 'paid' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200' : ''
+                                                order.status === 'processing' || order.payment_status === 'paid' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200' : 
+                                                order.status === 'shipped' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200' : ''
                                             }
                                         >
                                             {order.status === 'processing' || order.payment_status === 'paid' ? 'In Progress' :
+                                             order.status === 'shipped' ? 'Shipped' :
                                              order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                                         </Badge>
                                     </TableCell>

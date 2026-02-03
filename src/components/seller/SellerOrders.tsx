@@ -100,6 +100,27 @@ export function SellerOrders() {
 
   useEffect(() => {
     fetchOrders();
+
+    // ======= REALTIME SUBSCRIPTION =======
+    const channel = supabase
+      .channel('seller-orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'marketplace_orders'
+        },
+        () => {
+          console.log("Realtime update: Refreshing seller orders");
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeTab]);
 
   const fetchOrders = async () => {
@@ -416,14 +437,33 @@ export function SellerOrders() {
                                            </>
                                         )}
                                         {order.status === 'processing' && (
-                                            <Button 
-                                              className="w-full bg-green-600 hover:bg-green-700" 
-                                              onClick={() => updateOrderStatus(order.id, 'completed')}
-                                            >
-                                               <Truck className="h-4 w-4 mr-2" />
-                                               Mark as Delivered
-                                            </Button>
-                                        )}
+                                            <div className="flex gap-2 w-full">
+                                              <Button 
+                                                className="flex-1 bg-purple-600 hover:bg-purple-700 font-bold" 
+                                                onClick={() => updateOrderStatus(order.id, 'shipped')}
+                                              >
+                                                <Package className="h-4 w-4 mr-2" />
+                                                Mark as Shipped
+                                              </Button>
+                                              <Button 
+                                                variant="outline"
+                                                className="flex-1 bg-green-600 hover:bg-green-700 text-white hover:text-white border-none font-bold shadow-sm" 
+                                                onClick={() => updateOrderStatus(order.id, 'completed')}
+                                              >
+                                                <Truck className="h-4 w-4 mr-2" />
+                                                Quick Delivered
+                                              </Button>
+                                            </div>
+                                         )}
+                                         {order.status === 'shipped' && (
+                                             <Button 
+                                               className="w-full bg-green-600 hover:bg-green-700 font-black h-12 shadow-lg" 
+                                               onClick={() => updateOrderStatus(order.id, 'completed')}
+                                             >
+                                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                                Confirm Delivered
+                                             </Button>
+                                         )}
                                      </div>
                                   </div>
                                </div>

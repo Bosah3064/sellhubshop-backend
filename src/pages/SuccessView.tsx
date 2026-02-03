@@ -1,12 +1,13 @@
 
-import { useEffect } from "react";
-import { Check, CheckCircle2, MessageCircle, Truck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, CheckCircle2, MessageCircle, Truck, Loader2 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export function SuccessView({ cart, currentOrderId, paymentMethod, groupedItems, user, getTotal, getTotalDeliveryFee, navigate, clearCart }: any) {
+export function SuccessView({ cart, currentOrderId, paymentMethod, getTotal, getTotalDeliveryFee, navigate, clearCart }: any) {
+  const [notifyStatus, setNotifyStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
   
   // Trigger effects on mount of this view
   useEffect(() => {
@@ -24,21 +25,24 @@ export function SuccessView({ cart, currentOrderId, paymentMethod, groupedItems,
     
     // Auto-notify backend
     const notifyBackend = async () => {
+        if (!currentOrderId) return;
+        setNotifyStatus('sending');
         try {
-            const total = Math.ceil(getTotal() + getTotalDeliveryFee());
-            
-            await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/whatsapp/send`, {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/whatsapp/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    phone: "0700000000", 
-                    orderId: currentOrderId,
-                    message: `New Order! ${cart?.length || 0} items. Total: ${total}`
-                })
+                body: JSON.stringify({ orderId: currentOrderId })
             });
-            console.log("Backend notification sent");
+            const data = await response.json();
+            if (data.success) {
+                setNotifyStatus('sent');
+                console.log("Automatic notifications sent successfully");
+            } else {
+                setNotifyStatus('failed');
+            }
         } catch (e) {
             console.error("Backend notify failed", e);
+            setNotifyStatus('failed');
         }
     };
     notifyBackend();
@@ -50,7 +54,7 @@ export function SuccessView({ cart, currentOrderId, paymentMethod, groupedItems,
        audio.play();
     } catch(e) {}
 
-  }, []);
+  }, [currentOrderId]);
 
   return (
     <Card className="border-0 shadow-2xl bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
@@ -79,12 +83,33 @@ export function SuccessView({ cart, currentOrderId, paymentMethod, groupedItems,
             </div>
 
             <div className="flex items-center gap-4">
-               <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center border-2 border-blue-500">
-                  <Truck className="h-5 w-5 text-blue-700" />
+               <div className={`h-10 w-10 rounded-full flex items-center justify-center border-2 transition-colors duration-500 ${
+                 notifyStatus === 'sent' ? 'bg-blue-100 border-blue-500' : 
+                 notifyStatus === 'failed' ? 'bg-rose-100 border-rose-500' :
+                 'bg-gray-100 border-gray-300'
+               }`}>
+                  {notifyStatus === 'sending' ? (
+                     <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />
+                  ) : notifyStatus === 'sent' ? (
+                     <Truck className="h-5 w-5 text-blue-700" />
+                  ) : notifyStatus === 'failed' ? (
+                     <MessageCircle className="h-5 w-5 text-rose-700" />
+                  ) : (
+                     <Truck className="h-5 w-5 text-gray-400" />
+                  )}
                </div>
                <div className="text-left">
-                  <p className="font-bold text-gray-900">Order Dispatched</p>
-                  <p className="text-xs text-gray-500">Seller has been notified to prepare your items</p>
+                  <p className="font-bold text-gray-900">
+                    {notifyStatus === 'sending' ? 'Sending Notifications...' : 
+                     notifyStatus === 'sent' ? 'Order Dispatched' :
+                     notifyStatus === 'failed' ? 'Notification Offline' : 'Preparing Order'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {notifyStatus === 'sending' ? 'Notifying seller and buyer via WhatsApp...' :
+                     notifyStatus === 'sent' ? 'Seller and your phone have been notified.' :
+                     notifyStatus === 'failed' ? 'We couldn\'t send WhatsApp, please use manual link below.' :
+                     'Initializing order dispatch system...'}
+                  </p>
                </div>
             </div>
             

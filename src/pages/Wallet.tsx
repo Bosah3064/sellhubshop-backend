@@ -128,6 +128,45 @@ const Wallet = () => {
   )).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   // Chart Data Generation
+  const getChartData = () => {
+    if (!transactions.length) {
+      return [{ date: format(new Date(), 'MMM dd'), balance: wallet?.balance || 0 }];
+    }
+
+    const sorted = [...transactions]
+      .filter(t => t.status === 'completed')
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b).getTime());
+    
+    const data: { date: string; balance: number }[] = [];
+    let runningBalance = (wallet?.balance || 0);
+    
+    // To show a trend, we'll start from the current balance and work backwards,
+    // then reverse the array to show it forward-moving.
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return format(d, 'MMM dd');
+    }).reverse();
+
+    return last7Days.map(day => {
+      // Find transactions for this day
+      const dayTxs = transactions.filter(tx => 
+        tx.status === 'completed' && 
+        format(new Date(tx.created_at), 'MMM dd') === day
+      );
+      
+      // Calculate net change for this day
+      const netChange = dayTxs.reduce((acc, tx) => 
+        tx.type === 'credit' ? acc + tx.amount : acc - tx.amount, 0
+      );
+      
+      return {
+        date: day,
+        balance: Math.max(0, runningBalance + netChange) // Simplification for UX
+      };
+    });
+  };
+
   const chartData = getChartData();
 
   const totalCredited = transactions
