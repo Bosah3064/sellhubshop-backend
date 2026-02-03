@@ -634,7 +634,7 @@ const ProductCard = ({ product }: { product: Product }) => {
                           <span className="text-[8px] font-bold text-emerald-600">Verified Seller</span>
                         </div>
                     </div>
-                    <Link to={`/products/${product.id}`}>
+                    <Link to={`/marketplace?product=${product.id}`}>
                         <Button size="sm" className="bg-gray-100/80 hover:bg-primary hover:text-white text-gray-700 h-9 px-4 rounded-xl font-black transition-all border-none">
                             Details
                         </Button>

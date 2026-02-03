@@ -377,6 +377,67 @@ export default function Marketplace() {
     }
   }, [searchParams]);
 
+  // Deep Linking Logic - Open Product from URL
+  useEffect(() => {
+    const productId = searchParams.get("product");
+    
+    if (productId) {
+      const openDeepLinkProduct = async () => {
+        setIsLoading(true);
+        // First check if product is already in our loaded list
+        const existingProduct = products.find(p => p.id === productId);
+        
+        if (existingProduct) {
+          setSelectedProduct(existingProduct);
+          setProductDetailModalOpen(true);
+          setIsLoading(false);
+        } else {
+          // If not found locally, fetch it directly
+          try {
+            const { data, error } = await supabase
+              .from("products")
+              .select(`
+                *,
+                phone,
+                whatsapp,
+                email,
+                profiles:user_id(
+                  id,
+                  full_name,
+                  avatar_url,
+                  rating,
+                  total_ratings,
+                  created_at,
+                  phone,
+                  whatsapp,
+                  username,
+                  updated_at
+                )
+              `)
+              .eq("id", productId)
+              .single();
+              
+            if (data) {
+              setSelectedProduct(data as unknown as Product);
+              setProductDetailModalOpen(true);
+            }
+          } catch (err) {
+            console.error("Error deep linking to product:", err);
+            toast({
+              title: "Product not found",
+              description: "The product you are looking for may have been removed.",
+              variant: "destructive",
+            });
+          } finally {
+            setIsLoading(false);
+          }
+        }
+      };
+      
+      openDeepLinkProduct();
+    }
+  }, [searchParams, products]);
+
   // Initialize
   useEffect(() => {
     document.title = "Marketplace - Browse Products | SellHub";
