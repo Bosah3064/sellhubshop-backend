@@ -36,7 +36,12 @@ import {
   Home as HomeIcon,
   Shirt,
   Utensils,
-  Camera
+  Camera,
+  Building2,
+  Armchair,
+  Briefcase,
+  Wrench,
+  Monitor
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,27 +84,27 @@ const Index = () => {
   const { addToCart } = useCart();
 
   const categories = [
-    { name: "Electronics", icon: "Smartphone", color: "bg-blue-500", text: "text-blue-500" },
-    { name: "Vehicles", icon: "Car", color: "bg-amber-500", text: "text-amber-500" },
-    { name: "Property", icon: "HomeIcon", color: "bg-emerald-500", text: "text-emerald-500" },
-    { name: "Fashion", icon: "Shirt", color: "bg-purple-500", text: "text-purple-500" },
-    { name: "Home & Garden", icon: "Watch", color: "bg-rose-500", text: "text-rose-500" },
-    { name: "Jobs", icon: "Users", color: "bg-cyan-500", text: "text-cyan-500" },
-    { name: "Services", icon: "Shield", color: "bg-indigo-500", text: "text-indigo-500" },
-    { name: "Health & Beauty", icon: "Sparkles", color: "bg-pink-500", text: "text-pink-500" }
+    { name: "Electronics", icon: "Smartphone", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Vehicles", icon: "Car", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Property", icon: "Building2", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Fashion", icon: "Shirt", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Home & Garden", icon: "Armchair", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Jobs", icon: "Briefcase", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Services", icon: "Wrench", color: "bg-emerald-500", text: "text-emerald-500" },
+    { name: "Health & Beauty", icon: "Heart", color: "bg-emerald-500", text: "text-emerald-500" }
   ];
 
   const getCategoryIcon = (iconName: string) => {
-    const iconProps = { className: "w-5 h-5" };
+    const iconProps = { className: "w-6 h-6" };
     switch (iconName) {
       case "Smartphone": return <Smartphone {...iconProps} />;
       case "Car": return <Car {...iconProps} />;
-      case "HomeIcon": return <HomeIcon {...iconProps} />;
+      case "Building2": return <Building2 {...iconProps} />;
       case "Shirt": return <Shirt {...iconProps} />;
-      case "Watch": return <Watch {...iconProps} />;
-      case "Users": return <Users {...iconProps} />;
-      case "Shield": return <Shield {...iconProps} />;
-      case "Sparkles": return <Sparkles {...iconProps} />;
+      case "Armchair": return <Armchair {...iconProps} />;
+      case "Briefcase": return <Briefcase {...iconProps} />;
+      case "Wrench": return <Wrench {...iconProps} />;
+      case "Heart": return <Heart {...iconProps} />;
       default: return <Package {...iconProps} />;
     }
   };
@@ -402,7 +407,7 @@ const Index = () => {
             <div className="container mx-auto px-4">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
                    <div>
-                      <h2 className="text-3xl font-black text-gray-900 mb-2">Discovery Centers</h2>
+                      <h2 className="text-3xl font-black text-gray-900 mb-2">Discovery Center</h2>
                       <p className="text-gray-500 font-medium">Browse through our curated departments</p>
                    </div>
                    <Link to="/marketplace">
@@ -417,12 +422,12 @@ const Index = () => {
                         <Link 
                             to={`/marketplace?category=${encodeURIComponent(cat.name)}`}
                             key={cat.name} 
-                            className="group flex flex-col items-center p-4 rounded-3xl bg-gray-50/50 hover:bg-white border border-transparent hover:border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                            className="group flex flex-col items-center p-4 rounded-3xl bg-white border border-gray-100 hover:border-primary/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
                         >
-                            <div className={`w-16 h-16 rounded-2xl ${cat.color} bg-opacity-10 group-hover:bg-opacity-20 flex items-center justify-center ${cat.text} mb-3 group-hover:scale-110 transition-transform duration-300`}>
+                            <div className={`w-16 h-16 rounded-2xl bg-primary/5 group-hover:bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform duration-300`}>
                                 {getCategoryIcon(cat.icon)}
                             </div>
-                            <span className="text-xs font-bold text-gray-600 group-hover:text-gray-900 text-center leading-tight">{cat.name}</span>
+                            <span className="text-xs font-bold text-gray-600 group-hover:text-primary text-center leading-tight">{cat.name}</span>
                         </Link>
                     ))}
                 </div>

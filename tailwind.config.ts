@@ -61,6 +61,26 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Safaricom Official Brand Colors
+        safaricom: {
+          green: "#00A650",
+          "dark-green": "#008040",
+          "light-green": "#E6F7EF",
+          red: "#E30613",
+          "dark-red": "#B30510",
+          blue: "#0077BE",
+          orange: "#FF6B35",
+          yellow: "#FFC107",
+          white: "#FFFFFF",
+          black: "#1A1A1A",
+          gray: {
+            900: "#1A1A1A",
+            700: "#4A4A4A",
+            500: "#9E9E9E",
+            300: "#E0E0E0",
+            100: "#F5F5F5",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

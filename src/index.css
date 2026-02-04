@@ -8,121 +8,121 @@
 /* Safaricom Design System */
 @layer base {
   :root {
-    /* Safaricom Colors */
+    /* Safaricom Official Brand Colors */
     --background: 0 0% 100%;
-    --foreground: 142 100% 20%;
-    /* Dark green for text */
+    --foreground: 0 0% 10%; /* Dark text for readability */
 
     --card: 0 0% 100%;
-    --card-foreground: 142 100% 20%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 142 100% 20%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Primary - Safaricom Green */
-    --primary: 142 100% 28%;
-    /* #007E3A */
-    --primary-foreground: 0 0% 100%;
+    /* Primary - Safaricom Green #00A650 */
+    --primary: 145 100% 33%; /* HSL for #00A650 */
+    --primary-foreground: 0 0% 100%; /* White text on green */
 
-    /* Secondary - Safaricom Orange */
-    --secondary: 20 100% 50%;
-    /* #FF6600 */
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary - Safaricom Red #E30613 */
+    --secondary: 356 92% 46%; /* HSL for #E30613 */
+    --secondary-foreground: 0 0% 100%; /* White text on red */
 
-    --muted: 142 30% 96%;
-    --muted-foreground: 142 20% 40%;
+    --muted: 145 20% 96%; /* Light green tint */
+    --muted-foreground: 0 0% 40%; /* Dark gray for readability */
 
-    /* Accent - Safaricom Yellow */
-    --accent: 45 100% 51%;
-    /* #FFCC00 */
-    --accent-foreground: 142 100% 20%;
+    /* Accent - Safaricom Blue #0077BE */
+    --accent: 200 100% 37%; /* HSL for #0077BE */
+    --accent-foreground: 0 0% 100%; /* White text on blue */
 
-    --destructive: 0 84.2% 60.2%;
+    /* Destructive - Safaricom Red */
+    --destructive: 356 92% 46%; /* Same as secondary */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 142 30% 85%;
-    --input: 142 30% 85%;
-    --ring: 142 100% 28%;
+    --border: 0 0% 88%; /* Light gray borders */
+    --input: 0 0% 88%; /* Light gray input borders */
+    --ring: 145 100% 33%; /* Safaricom green focus ring */
 
     --radius: 0.5rem;
 
     /* Crystal Premium Colors (Light Overhaul) */
     --admin-bg: 220 30% 98%;
     --admin-card: 0 0% 100%;
-    --admin-primary: 270 100% 55%; /* Vibrant Violet */
-    --admin-secondary: 190 100% 45%; /* Electric Cyan */
-    --admin-accent: 330 100% 55%; /* Luminous Pink */
+    --admin-primary: 145 100% 33%; /* Safaricom Green for admin */
+    --admin-secondary: 200 100% 37%; /* Safaricom Blue */
+    --admin-accent: 356 92% 46%; /* Safaricom Red */
     --admin-glass-bg: rgba(255, 255, 255, 0.65);
     --admin-glass-border: rgba(255, 255, 255, 0.4);
-    --admin-text-primary: 224 71% 4%;
-    --admin-text-secondary: 224 10% 40%;
+    --admin-text-primary: 0 0% 10%;
+    --admin-text-secondary: 0 0% 40%;
     
-    /* Modern Gradient System */
-    --gradient-premium: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --gradient-cyber: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
-    --gradient-neon: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%);
+    /* Modern Gradient System - Safaricom themed */
+    --gradient-premium: linear-gradient(135deg, #00A650 0%, #008040 100%);
+    --gradient-cyber: linear-gradient(135deg, #0077BE 0%, #005A8C 100%);
+    --gradient-neon: linear-gradient(135deg, #00A650 0%, #0077BE 100%);
     --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
     
-    /* Glassmorphism Colors */
+    /* Glassmorphism Colors - Safaricom green tint */
     --glass-white: rgba(255, 255, 255, 0.1);
     --glass-white-strong: rgba(255, 255, 255, 0.25);
     --glass-black: rgba(0, 0, 0, 0.1);
-    --glass-primary: rgba(0, 126, 58, 0.1);
+    --glass-primary: rgba(0, 166, 80, 0.1); /* Safaricom green */
     
-    /* Enhanced Shadows */
-    --shadow-glow-primary: 0 0 40px rgba(0, 126, 58, 0.3);
-    --shadow-glow-secondary: 0 0 40px rgba(255, 102, 0, 0.3);
+    /* Enhanced Shadows - Safaricom green glow */
+    --shadow-glow-primary: 0 0 40px rgba(0, 166, 80, 0.3);
+    --shadow-glow-secondary: 0 0 40px rgba(227, 6, 19, 0.3);
     --shadow-elevated: 0 20px 60px rgba(0, 0, 0, 0.12);
     --shadow-floating: 0 30px 90px rgba(0, 0, 0, 0.15);
 
-    /* Sidebar */
-    --sidebar-background: 142 30% 98%;
-    --sidebar-foreground: 142 100% 20%;
-    --sidebar-primary: 142 100% 28%;
+    /* Sidebar - Safaricom themed */
+    --sidebar-background: 145 20% 98%; /* Very light green */
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-primary: 145 100% 33%; /* Safaricom green */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 142 30% 90%;
-    --sidebar-accent-foreground: 142 100% 20%;
-    --sidebar-border: 142 30% 85%;
-    --sidebar-ring: 142 100% 28%;
+    --sidebar-accent: 145 20% 95%; /* Light green hover */
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 145 100% 33%;
   }
 
   .dark {
-    --background: 142 45% 8%;
-    --foreground: 142 20% 95%;
+    --background: 0 0% 8%;
+    --foreground: 0 0% 95%;
 
-    --card: 142 40% 10%;
-    --card-foreground: 142 20% 95%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 142 40% 10%;
-    --popover-foreground: 142 20% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 142 100% 35%;
+    /* Primary - Brighter Safaricom green for dark mode */
+    --primary: 145 100% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 20 100% 55%;
+    /* Secondary - Brighter red for dark mode */
+    --secondary: 356 92% 55%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 142 30% 15%;
-    --muted-foreground: 142 20% 70%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 70%;
 
-    --accent: 45 100% 55%;
-    --accent-foreground: 142 100% 10%;
+    /* Accent - Brighter blue for dark mode */
+    --accent: 200 100% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 356 92% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 142 30% 20%;
-    --input: 142 30% 20%;
-    --ring: 142 100% 35%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 145 100% 40%;
 
-    --sidebar-background: 142 40% 8%;
-    --sidebar-foreground: 142 20% 95%;
-    --sidebar-primary: 142 100% 35%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 145 100% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 142 30% 15%;
-    --sidebar-accent-foreground: 142 20% 95%;
-    --sidebar-border: 142 30% 20%;
-    --sidebar-ring: 142 100% 35%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 145 100% 40%;
   }
 }
 
@@ -302,10 +302,10 @@
 
   @keyframes glow-pulse {
     0%, 100% {
-      box-shadow: 0 0 20px rgba(0, 126, 58, 0.4);
+      box-shadow: 0 0 20px rgba(0, 166, 80, 0.4); /* Safaricom green */
     }
     50% {
-      box-shadow: 0 0 40px rgba(0, 126, 58, 0.6);
+      box-shadow: 0 0 40px rgba(0, 166, 80, 0.6);
     }
   }
 
@@ -514,7 +514,7 @@
   }
 
   .hover-glow-primary:hover {
-    box-shadow: 0 0 30px rgba(0, 126, 58, 0.4);
+    box-shadow: 0 0 30px rgba(0, 166, 80, 0.4); /* Safaricom green glow */
   }
 
   .hover-scale {
